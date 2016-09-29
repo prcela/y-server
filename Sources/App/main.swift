@@ -21,7 +21,7 @@ drop.socket("chat") { req, ws in
         let jsonBytes = try JSON(bytes: bytes)
         let json = jsonBytes.object!
         
-        print(json)
+        print(try jsonBytes.serialize(prettyPrint: true))
         
         if let msgFuncName = json["msg_func"]?.string,
             let msgFunc = MessageFunc(rawValue: msgFuncName)
@@ -51,8 +51,8 @@ drop.socket("chat") { req, ws in
                 
             case .CreateMatch:
                 let match = Match()
-                match.diceMaterials = (json["dice_materials"]!.array as! [Node]).map({ node in
-                    return node.string!
+                match.diceMaterials = (json["dice_materials"]!.array as! [JSON]).map({ json in
+                    return json.node.string!
                 })
                 match.diceNum = json["dice_num"]!.int!
                 let player = Room.main.findPlayer(id: id!)

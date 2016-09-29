@@ -10,6 +10,13 @@ drop.get { req in
     ])
 }
 
+drop.get("online_status") { request in
+    return try JSON(node: [
+        "room_main_ct": Room.main.connections.count
+        ])
+}
+
+
 drop.resource("posts", PostController())
 
 drop.socket("chat") { req, ws in

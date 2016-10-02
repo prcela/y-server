@@ -1,3 +1,8 @@
+Vapor server for yamb dice game 
+
+https://itunes.apple.com/hr/app/yamb/id354188615?mt=8
+
+
 # Basic Template
 
 A basic vapor template for starting a new Vapor web application. If you're using vapor toolbox, you can use: `vapor new --template=basic`

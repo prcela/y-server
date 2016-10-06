@@ -14,6 +14,8 @@ class Player
 {
     var id: String
     var alias: String
+    var connected = true
+    
     
     init(id: String, alias: String)
     {
@@ -23,6 +25,6 @@ class Player
     
     func node() -> Node
     {
-        return Node(["id":Node(id), "alias":Node(alias)])
+        return Node(["id":Node(id), "alias":Node(alias), "connected": Node(connected)])
     }
 }

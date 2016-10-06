@@ -51,12 +51,19 @@ class Room
     
     
     // send to all in room
-    func send(_ json: JSON) throws {
+    func send(_ json: JSON) {
         
         for (_, socket) in connections
         {
             socket.send(json)
         }
+    }
+    
+    // send info to all in room
+    func sendInfo()
+    {
+        let json = try! JSON(node: node())
+        send(json)
     }
     
     

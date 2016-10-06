@@ -3,6 +3,8 @@ import Foundation
 
 let drop = Droplet()
 
+private let minRequiredVersion = 1
+
 drop.get { req in
     let lang = req.headers["Accept-Language"]?.string ?? "en"
     return try drop.view.make("welcome", [
@@ -10,8 +12,9 @@ drop.get { req in
     ])
 }
 
-drop.get("online_status") { request in
+drop.get("info") { request in
     return try JSON(node: [
+        "min_required_version": minRequiredVersion,
         "room_main_ct": Room.main.connections.count
         ])
 }
@@ -28,7 +31,7 @@ drop.socket("chat") { req, ws in
         let jsonBytes = try JSON(bytes: bytes)
         let json = jsonBytes.object!
         
-        print(try jsonBytes.serialize(prettyPrint: true))
+        print(json)
         
         if let msgFuncName = json["msg_func"]?.string,
             let msgFunc = MessageFunc(rawValue: msgFuncName)
@@ -48,11 +51,12 @@ drop.socket("chat") { req, ws in
                         player = Player(id: newId, alias: alias)
                         Room.main.freePlayers.append(player!)
                     }
+                    player?.connected = true
                     
                     Room.main.connections[newId] = ws
                     
                     // send room info to all
-                    try Room.main.send(JSON(node: Room.main.node()))
+                    Room.main.sendInfo()
                     
                 }
                 
@@ -73,7 +77,7 @@ drop.socket("chat") { req, ws in
                 Room.main.matches.append(match)
                 
                 // send room info to all
-                try Room.main.send(JSON(node: Room.main.node()))
+                Room.main.sendInfo()
                 
             case .JoinMatch:
                 if let player = Room.main.findPlayer(id: id!),
@@ -90,7 +94,7 @@ drop.socket("chat") { req, ws in
                     match.state = .Playing
                     
                     // send room info to all
-                    try Room.main.send(JSON(node: Room.main.node()))
+                    Room.main.sendInfo()
                     
                     try match.send(JSON(node:["msg_func":msgFuncName, "isOK":true, "match_id":matchId]))
                 }
@@ -110,7 +114,7 @@ drop.socket("chat") { req, ws in
                 }
                 
                 // send room info to all
-                try Room.main.send(JSON(node: Room.main.node()))
+                Room.main.sendInfo()
                 
                 
             case .Turn:
@@ -126,6 +130,7 @@ drop.socket("chat") { req, ws in
                 break
             }
         }
+        
     }
     
     ws.onClose = { ws, _, _, _ in
@@ -135,9 +140,14 @@ drop.socket("chat") { req, ws in
         
         Room.main.connections.removeValue(forKey: id!)
         
+        if let player = Room.main.findPlayer(id: id!)
+        {
+            player.connected = false
+        }
+        
         // send to all that player has been disconnected
-        let jsonResponse = try JSON(node: ["msg_func":"disjoin", "id":id!])
-        try Room.main.send(jsonResponse)
+        let jsonResponse = try JSON(node: ["msg_func":"disconnected", "id":id!])
+        Room.main.send(jsonResponse)
     }
     
     ws.onPing = {ws, _ in

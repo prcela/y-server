@@ -148,6 +148,9 @@ drop.socket("chat") { req, ws in
         // send to all that player has been disconnected
         let jsonResponse = try JSON(node: ["msg_func":"disconnected", "id":id!])
         Room.main.send(jsonResponse)
+        
+        // remove player
+        Room.main.removePlayer(id: id!)
     }
     
     ws.onPing = {ws, _ in

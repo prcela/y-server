@@ -36,6 +36,24 @@ class Room
         return nil
     }
     
+    func removePlayer(id: String)
+    {
+        if let idx = freePlayers.index(where: { (p) -> Bool in
+            return p.id == id
+        }) {
+            freePlayers.remove(at: idx)
+        }
+        
+        for m in matches
+        {
+            if let idx = m.players.index(where: { (p) -> Bool in
+                return p.id == id
+            }) {
+                m.players.remove(at: idx)
+            }
+        }
+    }
+    
     func findMatch(id: UInt) -> Match?
     {
         for m in matches

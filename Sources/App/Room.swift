@@ -44,12 +44,17 @@ class Room
             freePlayers.remove(at: idx)
         }
         
-        for m in matches
+        for (idxMatch,m) in matches.enumerated()
         {
             if let idx = m.players.index(where: { (p) -> Bool in
                 return p.id == id
             }) {
                 m.players.remove(at: idx)
+                
+                if m.players.isEmpty
+                {
+                    matches.remove(at: idxMatch)
+                }
             }
         }
     }

@@ -3,7 +3,7 @@ import Foundation
 
 let drop = Droplet()
 
-private let minRequiredVersion = 1
+private let minRequiredVersion = 2
 
 drop.get { req in
     let lang = req.headers["Accept-Language"]?.string ?? "en"
@@ -116,6 +116,15 @@ drop.socket("chat") { req, ws in
                 // send room info to all
                 Room.main.sendInfo()
                 
+            case .InvitePlayer:
+                
+                let recipientId = json["recipient"]!.string!
+                Room.main.connections[recipientId]?.send(jsonBytes)
+                
+            case .IgnoreInvitation:
+                
+                let senderId = json["sender"]!.string!
+                Room.main.connections[senderId]?.send(jsonBytes)
                 
             case .Turn:
                 if let matchId = json["match_id"]?.uint,
@@ -151,6 +160,9 @@ drop.socket("chat") { req, ws in
         
         // remove player
         Room.main.removePlayer(id: id!)
+        
+        // send info to all players
+        Room.main.sendInfo()
     }
     
     ws.onPing = {ws, _ in

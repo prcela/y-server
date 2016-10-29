@@ -26,6 +26,7 @@ class Match
     var players = [Player]()
     var diceMaterials: [String] = ["a","b"]
     var diceNum: Int = 6
+    var bet: Int = 0
     
     
     init()
@@ -42,6 +43,7 @@ class Match
         return Node(["id":Node(id),
                      "name":"proba",
                      "state":Node(state.rawValue),
+                     "bet":Node(bet),
                      "players":Node(playersInfo),
                      "dice_num":Node(diceNum),
                      "dice_materials": Node([Node(diceMaterials.first!),Node(diceMaterials.last!)])])

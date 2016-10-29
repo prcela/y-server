@@ -15,7 +15,8 @@ drop.get { req in
 drop.get("info") { request in
     return try JSON(node: [
         "min_required_version": minRequiredVersion,
-        "room_main_ct": Room.main.connections.count
+        "room_main_ct": Room.main.connections.count,
+        "room_main_free_ct": Room.main.freePlayers.count
         ])
 }
 
@@ -66,6 +67,7 @@ drop.socket("chat") { req, ws in
                     return json.node.string!
                 })
                 match.diceNum = json["dice_num"]!.int!
+                match.bet = json["bet"]?.int ?? 0
                 let player = Room.main.findPlayer(id: id!)
                 if let idx = Room.main.freePlayers.index(where: { (p) -> Bool in
                     return p.id == id!

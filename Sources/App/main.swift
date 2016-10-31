@@ -48,8 +48,10 @@ drop.socket("chat") { req, ws in
                     
                     if player == nil
                     {
+                        let avgScore6 = json["avg_score_6"]?.double
+                        let diamonds = json["diamonds"]?.int
                         // instantiate new player
-                        player = Player(id: newId, alias: alias)
+                        player = Player(id: newId, alias: alias, avgScore6: avgScore6 ?? 0, diamonds: diamonds ?? 0)
                         Room.main.freePlayers.append(player!)
                     }
                     player?.connected = true
@@ -127,6 +129,16 @@ drop.socket("chat") { req, ws in
                 
                 let senderId = json["sender"]!.string!
                 Room.main.connections[senderId]?.send(jsonBytes)
+                
+            case .UpdatePlayer:
+                if let player = Room.main.findPlayer(id: id!)
+                {
+                    player.avgScore6 = json["avg_score_6"]!.double!
+                    player.diamonds = json["diamonds"]!.int!
+                    player.alias = json["alias"]!.string!
+                    
+                    Room.main.sendInfo()
+                }
                 
             case .Turn:
                 if let matchId = json["match_id"]?.uint,

@@ -20,6 +20,7 @@ enum MessageFunc: String
     case Turn = "turn"
     case InvitePlayer = "invite_player"
     case IgnoreInvitation = "ignore_invitation"
+    case UpdatePlayer = "update_player"
 }
 
 enum Turn: String

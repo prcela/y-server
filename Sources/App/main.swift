@@ -64,6 +64,7 @@ drop.socket("chat") { req, ws in
                 }
                 
             case .CreateMatch:
+                guard id != nil else {return}
                 let match = Match()
                 match.diceMaterials = (json["dice_materials"]!.array as! [JSON]).map({ json in
                     return json.node.string!
@@ -84,6 +85,7 @@ drop.socket("chat") { req, ws in
                 Room.main.sendInfo()
                 
             case .JoinMatch:
+                guard id != nil else {return}
                 if let player = Room.main.findPlayer(id: id!),
                     let matchId = json["match_id"]?.uint,
                     let match = Room.main.findMatch(id: matchId)
@@ -104,6 +106,7 @@ drop.socket("chat") { req, ws in
                 }
                 
             case .LeaveMatch:
+                guard id != nil else {return}
                 let matchId = json["match_id"]!.uint
                 
                 if let idx = Room.main.matches.index(where: {$0.id == matchId})
@@ -131,6 +134,7 @@ drop.socket("chat") { req, ws in
                 Room.main.connections[senderId]?.send(jsonBytes)
                 
             case .UpdatePlayer:
+                guard id != nil else {return}
                 if let player = Room.main.findPlayer(id: id!)
                 {
                     player.avgScore6 = json["avg_score_6"]!.double!
@@ -141,11 +145,12 @@ drop.socket("chat") { req, ws in
                 }
                 
             case .Turn:
-                if let matchId = json["match_id"]?.uint,
+                if let id = json["id"]?.string,
+                    let matchId = json["match_id"]?.uint,
                     let match = Room.main.findMatch(id: matchId)
                 {
                     // forward message to other participants in match
-                    try match.sendOthers(fromPlayerId: id!, json: jsonBytes)
+                    try match.sendOthers(fromPlayerId: id, json: jsonBytes)
                 }
                 
             default:

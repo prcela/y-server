@@ -51,7 +51,7 @@ drop.socket("chat") { req, ws in
                         let avgScore6 = json["avg_score_6"]?.double
                         let diamonds = json["diamonds"]?.int
                         // instantiate new player
-                        player = Player(id: newId, alias: alias, avgScore6: avgScore6 ?? 0, diamonds: diamonds ?? 0)
+                        player = Player(id: newId, alias: alias, avgScore6: avgScore6 ?? 0, diamonds: diamonds ?? 100)
                         Room.main.freePlayers.append(player!)
                     }
                     player?.connected = true

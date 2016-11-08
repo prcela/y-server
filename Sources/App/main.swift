@@ -3,7 +3,7 @@ import Foundation
 
 let drop = Droplet()
 
-private let minRequiredVersion = 2
+private let minRequiredVersion = 4
 
 drop.get { req in
     let lang = req.headers["Accept-Language"]?.string ?? "en"
@@ -16,7 +16,7 @@ drop.get("info") { request in
     return try JSON(node: [
         "min_required_version": minRequiredVersion,
         "room_main_ct": Room.main.connections.count,
-        "room_main_free_ct": Room.main.freePlayers.count
+        "room_main_free_ct": 0 // ne koristimo više
         ])
 }
 
@@ -52,9 +52,10 @@ drop.socket("chat") { req, ws in
                         let diamonds = json["diamonds"]?.int
                         // instantiate new player
                         player = Player(id: newId, alias: alias, avgScore6: avgScore6 ?? 0, diamonds: diamonds ?? 100)
-                        Room.main.freePlayers.append(player!)
+                        Room.main.players.append(player!)
                     }
                     player?.connected = true
+                    player?.disconnectedAt = nil
                     
                     Room.main.connections[newId] = ws
                     
@@ -72,13 +73,7 @@ drop.socket("chat") { req, ws in
                 match.diceNum = json["dice_num"]!.int!
                 match.bet = json["bet"]?.int ?? 0
                 let player = Room.main.findPlayer(id: id!)
-                if let idx = Room.main.freePlayers.index(where: { (p) -> Bool in
-                    return p.id == id!
-                })
-                {
-                    Room.main.freePlayers.remove(at: idx)
-                }
-                match.players.append(player!)
+                match.playerIds.append(id!)
                 Room.main.matches.append(match)
                 
                 // send room info to all
@@ -90,14 +85,13 @@ drop.socket("chat") { req, ws in
                     let matchId = json["match_id"]?.uint,
                     let match = Room.main.findMatch(id: matchId)
                 {
-                    if let idx = Room.main.freePlayers.index(where: { (p) -> Bool in
-                        return p.id == id!
-                    })
-                    {
-                        Room.main.freePlayers.remove(at: idx)
-                    }
-                    match.players.append(player)
+                    match.playerIds.append(player.id)
                     match.state = .Playing
+                    
+                    if let diceMat = json["dice_mat"]?.string
+                    {
+                        match.diceMaterials[1] = diceMat
+                    }
                     
                     // send room info to all
                     Room.main.sendInfo()
@@ -114,10 +108,6 @@ drop.socket("chat") { req, ws in
                     let match = Room.main.matches[idx]
                     Room.main.matches.remove(at: idx)
                     try match.sendOthers(fromPlayerId: id!, json: jsonBytes)
-                    for player in match.players
-                    {
-                        Room.main.freePlayers.append(player)
-                    }
                 }
                 
                 // send room info to all
@@ -171,14 +161,17 @@ drop.socket("chat") { req, ws in
         if let player = Room.main.findPlayer(id: id!)
         {
             player.connected = false
+            player.disconnectedAt = Date()
         }
         
         // send to all that player has been disconnected
         let jsonResponse = try JSON(node: ["msg_func":"disconnected", "id":id!])
         Room.main.send(jsonResponse)
         
-        // remove player
-        Room.main.removePlayer(id: id!)
+        // remove player if it is not in match
+        Room.main.removeFreePlayer(id: id!)
+        
+        Room.main.clean()
         
         // send info to all players
         Room.main.sendInfo()

@@ -17,6 +17,7 @@ class Player
     var avgScore6: Double
     var diamonds: Int
     var connected = true
+    var disconnectedAt: Date?
     
     
     init(id: String, alias: String, avgScore6: Double, diamonds: Int)

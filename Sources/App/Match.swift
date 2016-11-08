@@ -23,7 +23,7 @@ class Match
     
     var id: UInt
     var state:MatchState = .WaitingForPlayers
-    var players = [Player]()
+    var playerIds = [String]()
     var diceMaterials: [String] = ["a","b"]
     var diceNum: Int = 6
     var bet: Int = 0
@@ -37,47 +37,43 @@ class Match
     
     func node() -> Node
     {
-        let playersInfo = players.map({ player in
-            return player.node()
-        })
         return Node(["id":Node(id),
                      "name":"proba",
                      "state":Node(state.rawValue),
                      "bet":Node(bet),
-                     "players":Node(playersInfo),
+                     "players":Node(playerIds.map({ Node($0) })),
                      "dice_num":Node(diceNum),
-                     "dice_materials": Node([Node(diceMaterials.first!),Node(diceMaterials.last!)])])
+                     "dice_materials": Node(diceMaterials.map({ Node($0) })) ])
     }
     
     // send to all in match
     func send(_ json: JSON) throws
     {
-        for (id, socket) in Room.main.connections
+        for (idCon, socket) in Room.main.connections
         {
-            for player in players
+            for playerId in playerIds
             {
-                if player.id == id
+                if playerId == idCon
                 {
                     socket.send(json)
                     continue
                 }
             }
-            
         }
     }
     
     // send to all others in match
     func sendOthers(fromPlayerId: String, json: JSON) throws
     {
-        for (id, socket) in Room.main.connections
+        for (conId, socket) in Room.main.connections
         {
-            if id == fromPlayerId
+            if conId == fromPlayerId
             {
                 continue
             }
-            for player in players
+            for playerId in playerIds
             {
-                if player.id == id
+                if playerId == conId
                 {
                     socket.send(json)
                     continue

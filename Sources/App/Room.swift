@@ -7,7 +7,7 @@ class Room
     static let main = Room()
     
     var connections: [String: WebSocket]
-    var freePlayers = [Player]()
+    var players = [Player]()
     var matches = [Match]()
     
     init() {
@@ -16,45 +16,51 @@ class Room
     
     func findPlayer(id: String) -> Player?
     {
-        for p in freePlayers
+        for p in players
         {
             if p.id == id
             {
                 return p
             }
         }
-        
-        for m in matches {
-            for p in m.players
-            {
-                if p.id == id
-                {
-                    return p
-                }
-            }
-        }
         return nil
     }
     
-    func removePlayer(id: String)
+    func removeFreePlayer(id: String)
     {
-        if let idx = freePlayers.index(where: { (p) -> Bool in
-            return p.id == id
-        }) {
-            freePlayers.remove(at: idx)
-        }
-        
-        for (idxMatch,m) in matches.enumerated()
+        for m in matches
         {
-            if let idx = m.players.index(where: { (p) -> Bool in
-                return p.id == id
-            }) {
-                m.players.remove(at: idx)
-                
-                if m.players.isEmpty
+            if m.playerIds.contains(id)
+            {
+                return
+            }
+        }
+        if let idx = players.index(where: { (p) -> Bool in
+            return p.id == id
+        })
+        {
+            players.remove(at: idx)
+        }
+    }
+    
+    func clean()
+    {
+        // obriši mečeve sa disconnected igračima
+        for (mIdx,m) in matches.enumerated()
+        {
+            var anyConnected = false
+            for playerId in m.playerIds
+            {
+                if let p = findPlayer(id: playerId), p.connected
                 {
-                    matches.remove(at: idxMatch)
+                    anyConnected = true
+                    break
                 }
+            }
+            
+            if !anyConnected
+            {
+                matches.remove(at: mIdx)
             }
         }
     }
@@ -93,12 +99,14 @@ class Room
     
     func node() -> Node
     {
-        let playersInfo = freePlayers.map({ player in
+        let playersInfo = players.map({ player in
             return player.node()
         })
         let matchesInfo = matches.map({ match in
             return match.node()
         })
-        return ["msg_func":"room_info", "free_players":Node(playersInfo), "matches": Node(matchesInfo)]
+        return ["msg_func": "room_info",
+                "players": Node(playersInfo),
+                "matches": Node(matchesInfo)]
     }
 }

@@ -1,5 +1,18 @@
 import Vapor
 import Foundation
+import MongoKitten
+
+let server: Server
+do {
+    server = try Server(mongoURL: "mongodb://localhost:27017", automatically: true)
+} catch {
+    // Unable to connect
+    fatalError("MongoDB is not available on the given host and port")
+}
+
+let database = server["ydb"]
+let scoresCollection = database["scores"]
+PlayerScore.loadScoresFromCollection()
 
 let drop = Droplet()
 
@@ -18,6 +31,24 @@ drop.get("info") { request in
         "room_main_ct": Room.main.connections.count,
         "room_main_free_ct": 0 // ne koristimo više
         ])
+}
+
+
+drop.get("scores") { request in
+    
+    return try JSON(node:Node(PlayerScore.allScores.map({ (score) -> Node in
+        return score.node()
+    })))
+}
+
+drop.post("score") { request in
+    guard let json = request.json
+        else {
+            throw Abort.badRequest
+    }
+    
+    try PlayerScore.upsertScore(json: json)
+    return "ok"
 }
 
 

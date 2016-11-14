@@ -10,7 +10,7 @@ do {
     fatalError("MongoDB is not available on the given host and port")
 }
 
-let database = server["ydb"]
+let database = server["yamb"]
 let scoresCollection = database["scores"]
 PlayerScore.loadScoresFromCollection()
 

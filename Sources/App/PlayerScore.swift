@@ -10,50 +10,96 @@ import Foundation
 import MongoKitten
 import Vapor
 
+class DiceScore
+{
+    var score: Int32
+    var timestamp: Date
+    var stars: Double
+    var avg_score: Double
+    
+    init(json: JSON)
+    {
+        score = Int32(json["score"]!.int!)
+        timestamp = Date()
+        stars = json["stars"]!.double!
+        avg_score = json["avg_score"]!.double!
+    }
+    
+    func update(json: JSON)
+    {
+        let newScore = Int32(json["score"]!.int!)
+        if newScore > score
+        {
+            timestamp = Date()
+            score = newScore
+        }
+        stars = json["stars"]!.double!
+        avg_score = json["avg_score"]!.double!
+    }
+    
+    init?(value: Document?)
+    {
+        guard value != nil else {return nil}
+        score = value!["score"].int32
+        timestamp = value!["timestamp"].dateValue!
+        stars = value!["stars"].double
+        avg_score = value!["avg_score"].double
+    }
+    
+    func value() -> Value
+    {
+        return [
+            "score": .int32(score),
+            "timestamp": .dateTime(timestamp),
+            "stars": .double(stars),
+            "avg_score": .double(avg_score)
+        ]
+    }
+    
+    
+    
+    func node() -> Node
+    {
+        return [
+            "score": Node(Int(score)),
+            "timestamp": Node(timestamp.timeIntervalSince1970),
+            "stars": Node(stars),
+            "avg_score": Node(avg_score)
+        ]
+    }
+}
 
 class PlayerScore
 {
     static var allScores = [PlayerScore]()
     
-    var client_id: String
+    var player_id: String
     var alias: String
     var diamonds: Int32
     
-    var score_5: Int32?
-    var timestamp_5: Date?
-    var stars_5: Double?
-    var avg_score_5: Double?
-    
-    var score_6: Int32?
-    var timestamp_6: Date?
-    var stars_6: Double?
-    var avg_score_6: Double?
+    var dice5: DiceScore?
+    var dice6: DiceScore?
     
     var ct_matches_sp = 0
     var ct_matches_mp = 0
     
-    init(client_id: String, alias: String, diamonds: Int32)
+    init(player_id: String, alias: String, diamonds: Int32)
     {
-        self.client_id = client_id
+        self.player_id = player_id
         self.alias = alias
         self.diamonds = diamonds
     }
     
+    
+    
     init(scoreDocument: Document)
     {
-        client_id = scoreDocument["client_id"].string
+        player_id = scoreDocument["player_id"].string
         alias = scoreDocument["alias"].string
         diamonds = scoreDocument["diamonds"].int32
         
-        score_5 = scoreDocument["score_5"].int32Value
-        timestamp_5 = scoreDocument["timestamp_5"].dateValue
-        stars_5 = scoreDocument["stars_5"].doubleValue
-        avg_score_5 = scoreDocument["avg_score_5"].doubleValue
-        
-        score_6 = scoreDocument["score_6"].int32Value
-        timestamp_6 = scoreDocument["timestamp_6"].dateValue
-        stars_6 = scoreDocument["stars_6"].doubleValue
-        avg_score_6 = scoreDocument["avg_score_6"].doubleValue
+        dice5 = DiceScore(value: scoreDocument["5"].documentValue)
+        dice6 = DiceScore(value: scoreDocument["6"].documentValue)
         
         ct_matches_sp = scoreDocument["ct_matches_sp"].int
         ct_matches_mp = scoreDocument["ct_matches_mp"].int
@@ -64,31 +110,27 @@ class PlayerScore
         alias = json["alias"]!.string!
         diamonds = Int32(json["diamonds"]!.int!)
         
-        if let score_5 = json["score_5"]?.int,
-            let stars_5 = json["stars_5"]?.double,
-            let avg_score_5 = json["avg_score_5"]?.double
+        if let jsonDice5 = json["5"]
         {
-            self.stars_5 = stars_5
-            self.avg_score_5 = avg_score_5
-            
-            if self.score_5 == nil || Int32(score_5) > self.score_5!
+            if dice5 == nil
             {
-                self.score_5 = Int32(score_5)
-                self.timestamp_5 = Date()
+                dice5 = DiceScore(json: jsonDice5)
+            }
+            else
+            {
+                dice5?.update(json: jsonDice5)
             }
         }
         
-        if let score_6 = json["score_6"]?.int,
-            let stars_6 = json["stars_6"]?.double,
-            let avg_score_6 = json["avg_score_6"]?.double
+        if let jsonDice6 = json["6"]
         {
-            self.stars_6 = stars_6
-            self.avg_score_6 = avg_score_6
-            
-            if self.score_6 == nil || Int32(score_6) > self.score_6!
+            if dice6 == nil
             {
-                self.score_6 = Int32(score_6)
-                self.timestamp_6 = Date()
+                dice6 = DiceScore(json: jsonDice6)
+            }
+            else
+            {
+                dice6?.update(json: jsonDice6)
             }
         }
     }
@@ -96,28 +138,18 @@ class PlayerScore
     func document() -> Document
     {
         var scoreDocument: Document = [
-            "client_id": .string(client_id),
+            "player_id": .string(player_id),
             "alias": .string(alias),
             "diamonds": .int32(Int32(diamonds))]
         
-        if let score_5 = score_5,
-            let stars_5 = stars_5,
-            let avg_score_5 = avg_score_5
+        if let dice5 = dice5
         {
-            scoreDocument["score_5"] = .int32(score_5)
-            scoreDocument["timestamp_5"] = .dateTime(timestamp_5!)
-            scoreDocument["stars_5"] = .double(stars_5)
-            scoreDocument["avg_score_5"] = .double(avg_score_5)
+            scoreDocument["5"] = dice5.value()
         }
         
-        if let score_6 = score_6,
-            let stars_6 = stars_6,
-            let avg_score_6 = avg_score_6
+        if let dice6 = dice6
         {
-            scoreDocument["score_6"] = .int32(score_6)
-            scoreDocument["timestamp_6"] = .dateTime(timestamp_6!)
-            scoreDocument["stars_6"] = .double(stars_6)
-            scoreDocument["avg_score_6"] = .double(avg_score_6)
+            scoreDocument["6"] = dice6.value()
         }
         
         return scoreDocument
@@ -132,11 +164,11 @@ class PlayerScore
         }
     }
     
-    class func find(client_id: String) -> PlayerScore?
+    class func find(player_id: String) -> PlayerScore?
     {
         for score in allScores
         {
-            if score.client_id == client_id
+            if score.player_id == player_id
             {
                 return score
             }
@@ -146,45 +178,38 @@ class PlayerScore
     
     class func upsertScore(json: JSON) throws
     {
-        guard let client_id = json["client_id"]?.string,
+        guard let player_id = json["player_id"]?.string,
             let alias = json["alias"]?.string,
             let diamonds = json["diamonds"]?.int else {throw Abort.badRequest}
         
-        if let score = find(client_id: client_id)
+        if let score = find(player_id: player_id)
         {
             score.update(json: json)
-            
-            try scoresCollection.update(matching: ["client_id":.string(client_id)], to: score.document())
+            try scoresCollection.update(matching: ["player_id":.string(player_id)], to: score.document())
         }
         else
         {
-            let score = PlayerScore(client_id: client_id, alias: alias, diamonds: Int32(diamonds))
+            let score = PlayerScore(player_id: player_id, alias: alias, diamonds: Int32(diamonds))
             score.update(json: json)
-            
+            allScores.append(score)
             try scoresCollection.insert(score.document())
         }
     }
     
     func node() -> Node
     {
-        var result = ["client_id": Node(client_id),
+        var result = ["player_id": Node(player_id),
                       "alias": Node(alias),
                       "diamonds": Node(Int(diamonds))]
         
-        if score_5 != nil
+        if dice5 != nil
         {
-            result["score_5"] = Node(Int(score_5!))
-            result["timestamp_5"] = Node(timestamp_5!.timeIntervalSince1970)
-            result["stars_5"] = Node(stars_5!)
-            result["avg_score_5"] = Node(avg_score_5!)
+            result["5"] = dice5!.node()
         }
         
-        if score_6 != nil
+        if dice6 != nil
         {
-            result["score_6"] = Node(Int(score_6!))
-            result["timestamp_6"] = Node(timestamp_6!.timeIntervalSince1970)
-            result["stars_6"] = Node(stars_6!)
-            result["avg_score_6"] = Node(avg_score_6!)
+            result["6"] = dice6!.node()
         }
         
         return Node(result)

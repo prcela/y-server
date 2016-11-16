@@ -10,64 +10,6 @@ import Foundation
 import MongoKitten
 import Vapor
 
-class DiceScore
-{
-    var score: Int32
-    var timestamp: Date
-    var stars: Double
-    var avg_score: Double
-    
-    init(json: JSON)
-    {
-        score = Int32(json["score"]!.int!)
-        timestamp = Date()
-        stars = json["stars"]!.double!
-        avg_score = json["avg_score"]!.double!
-    }
-    
-    func update(json: JSON)
-    {
-        let newScore = Int32(json["score"]!.int!)
-        if newScore > score
-        {
-            timestamp = Date()
-            score = newScore
-        }
-        stars = json["stars"]!.double!
-        avg_score = json["avg_score"]!.double!
-    }
-    
-    init?(value: Document?)
-    {
-        guard value != nil else {return nil}
-        score = value!["score"].int32
-        timestamp = value!["timestamp"].dateValue!
-        stars = value!["stars"].double
-        avg_score = value!["avg_score"].double
-    }
-    
-    func value() -> Value
-    {
-        return [
-            "score": .int32(score),
-            "timestamp": .dateTime(timestamp),
-            "stars": .double(stars),
-            "avg_score": .double(avg_score)
-        ]
-    }
-    
-    
-    
-    func node() -> Node
-    {
-        return [
-            "score": Node(Int(score)),
-            "timestamp": Node(timestamp.timeIntervalSince1970),
-            "stars": Node(stars),
-            "avg_score": Node(avg_score)
-        ]
-    }
-}
 
 class PlayerScore
 {
@@ -155,14 +97,6 @@ class PlayerScore
         return scoreDocument
     }
     
-    class func loadScoresFromCollection()
-    {
-        allScores.removeAll()
-        for scoreDocument in try! scoresCollection.find().array
-        {
-            allScores.append(PlayerScore(scoreDocument: scoreDocument))
-        }
-    }
     
     class func find(player_id: String) -> PlayerScore?
     {
@@ -175,27 +109,7 @@ class PlayerScore
         }
         return nil
     }
-    
-    class func upsertScore(json: JSON) throws
-    {
-        guard let player_id = json["player_id"]?.string,
-            let alias = json["alias"]?.string,
-            let diamonds = json["diamonds"]?.int else {throw Abort.badRequest}
         
-        if let score = find(player_id: player_id)
-        {
-            score.update(json: json)
-            try scoresCollection.update(matching: ["player_id":.string(player_id)], to: score.document())
-        }
-        else
-        {
-            let score = PlayerScore(player_id: player_id, alias: alias, diamonds: Int32(diamonds))
-            score.update(json: json)
-            allScores.append(score)
-            try scoresCollection.insert(score.document())
-        }
-    }
-    
     func node() -> Node
     {
         var result = ["player_id": Node(player_id),

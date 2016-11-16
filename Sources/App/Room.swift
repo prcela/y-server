@@ -7,40 +7,10 @@ class Room
     static let main = Room()
     
     var connections: [String: WebSocket]
-    var players = [Player]()
     var matches = [Match]()
     
     init() {
         connections = [:]
-    }
-    
-    func findPlayer(id: String) -> Player?
-    {
-        for p in players
-        {
-            if p.id == id
-            {
-                return p
-            }
-        }
-        return nil
-    }
-    
-    func removeFreePlayer(id: String)
-    {
-        for m in matches
-        {
-            if m.playerIds.contains(id)
-            {
-                return
-            }
-        }
-        if let idx = players.index(where: { (p) -> Bool in
-            return p.id == id
-        })
-        {
-            players.remove(at: idx)
-        }
     }
     
     func clean()
@@ -51,7 +21,7 @@ class Room
             var anyConnected = false
             for playerId in m.playerIds
             {
-                if let p = findPlayer(id: playerId), p.connected
+                if let p = Player.find(id: playerId), p.connected
                 {
                     anyConnected = true
                     break
@@ -99,11 +69,27 @@ class Room
     
     func node() -> Node
     {
-        let playersInfo = players.map({ player in
-            return player.node()
-        })
-        let matchesInfo = matches.map({ match in
+        var activePlayers = Player.players.filter { (p) -> Bool in
+            return p.connected
+        }
+        
+        let matchesInfo = matches.map({ match -> Node in
+            for pId in match.playerIds
+            {
+                // add also player which is not connected but still exists in match :(
+                if !activePlayers.contains(where: { (p) -> Bool in
+                    return p.id == pId
+                }) {
+                    if let mPlayer = Player.find(id: pId)
+                    {
+                        activePlayers.append(mPlayer)
+                    }
+                }
+            }
             return match.node()
+        })
+        let playersInfo = activePlayers.map({ player in
+            return player.node()
         })
         return ["msg_func": "room_info",
                 "players": Node(playersInfo),

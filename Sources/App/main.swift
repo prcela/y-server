@@ -11,8 +11,12 @@ do {
 }
 
 let database = server["yamb"]
-let scoresCollection = database["scores"]
-PlayerScore.loadScoresFromCollection()
+let statItemsCollection = database["statItems"]
+let playersCollection = database["players"]
+
+StatItem.loadStats()
+Player.loadPlayers()
+
 
 let drop = Droplet()
 
@@ -29,7 +33,7 @@ drop.get("info") { request in
     return try JSON(node: [
         "min_required_version": minRequiredVersion,
         "room_main_ct": Room.main.connections.count,
-        "room_main_free_ct": 0 // ne koristimo više
+        "room_main_free_ct": 0 // deprecated
         ])
 }
 
@@ -41,18 +45,39 @@ drop.get("scores") { request in
     })))
 }
 
-drop.post("score") { request in
+drop.post("statItem") { request in
     guard let json = request.json
         else {
             throw Abort.badRequest
     }
     
-    try PlayerScore.upsertScore(json: json)
+    try StatItem.insert(json: json)
     return "ok"
 }
 
-
-drop.resource("posts", PostController())
+drop.post("updatePlayer") { request in
+    guard let json = request.json
+        else {
+            throw Abort.badRequest
+    }
+    
+    let id = json["id"]!.string!
+    if let player = Player.find(id: id)
+    {
+        player.update(json: json)
+        try playersCollection.update(matching: ["_id": .string(id)], to: player.document())
+    }
+    else
+    {
+        // instantiate new player
+        let player = Player(json: json)
+        Player.players.append(player)
+        try playersCollection.insert(player.document())
+    }
+    
+    
+    return "ok"
+}
 
 drop.socket("chat") { req, ws in
     var id: String? = nil
@@ -75,15 +100,14 @@ drop.socket("chat") { req, ws in
                 {
                     id = newId
                     
-                    var player = Room.main.findPlayer(id: newId)
+                    var player = Player.find(id: newId)
                     
                     if player == nil
                     {
-                        let avgScore6 = json["avg_score_6"]?.double
-                        let diamonds = json["diamonds"]?.int
                         // instantiate new player
-                        player = Player(id: newId, alias: alias, avgScore6: avgScore6 ?? 0, diamonds: diamonds ?? 100)
-                        Room.main.players.append(player!)
+                        player = Player(json: jsonBytes)
+                        Player.players.append(player!)
+                        try playersCollection.insert(player!.document())
                     }
                     player?.connected = true
                     player?.disconnectedAt = nil
@@ -103,7 +127,7 @@ drop.socket("chat") { req, ws in
                 })
                 match.diceNum = json["dice_num"]!.int!
                 match.bet = json["bet"]?.int ?? 0
-                let player = Room.main.findPlayer(id: id!)
+                let player = Player.find(id: id!)
                 match.playerIds.append(id!)
                 Room.main.matches.append(match)
                 
@@ -112,7 +136,7 @@ drop.socket("chat") { req, ws in
                 
             case .JoinMatch:
                 guard id != nil else {return}
-                if let player = Room.main.findPlayer(id: id!),
+                if let player = Player.find(id: id!),
                     let matchId = json["match_id"]?.uint,
                     let match = Room.main.findMatch(id: matchId)
                 {
@@ -156,11 +180,10 @@ drop.socket("chat") { req, ws in
                 
             case .UpdatePlayer:
                 guard id != nil else {return}
-                if let player = Room.main.findPlayer(id: id!)
+                if let player = Player.find(id: id!)
                 {
-                    player.avgScore6 = json["avg_score_6"]!.double!
-                    player.diamonds = json["diamonds"]!.int!
-                    player.alias = json["alias"]!.string!
+                    player.update(json: jsonBytes)
+                    try playersCollection.update(matching: ["_id":.string(id!)], to: player.document())
                     
                     Room.main.sendInfo()
                 }
@@ -189,7 +212,7 @@ drop.socket("chat") { req, ws in
         
         Room.main.connections.removeValue(forKey: id!)
         
-        if let player = Room.main.findPlayer(id: id!)
+        if let player = Player.find(id: id!)
         {
             player.connected = false
             player.disconnectedAt = Date()
@@ -198,9 +221,6 @@ drop.socket("chat") { req, ws in
         // send to all that player has been disconnected
         let jsonResponse = try JSON(node: ["msg_func":"disconnected", "id":id!])
         Room.main.send(jsonResponse)
-        
-        // remove player if it is not in match
-        Room.main.removeFreePlayer(id: id!)
         
         Room.main.clean()
         

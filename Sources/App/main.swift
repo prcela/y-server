@@ -37,14 +37,6 @@ drop.get("info") { request in
         ])
 }
 
-
-drop.get("scores") { request in
-    
-    return try JSON(node:Node(PlayerScore.allScores.map({ (score) -> Node in
-        return score.node()
-    })))
-}
-
 drop.post("statItem") { request in
     guard let json = request.json
         else {
@@ -113,6 +105,7 @@ drop.socket("chat") { req, ws in
                     player?.disconnectedAt = nil
                     
                     Room.main.connections[newId] = ws
+                    Room.main.connectedPlayers.append(player!)
                     
                     // send room info to all
                     Room.main.sendInfo()
@@ -127,9 +120,11 @@ drop.socket("chat") { req, ws in
                 })
                 match.diceNum = json["dice_num"]!.int!
                 match.bet = json["bet"]?.int ?? 0
-                let player = Player.find(id: id!)
-                match.playerIds.append(id!)
-                Room.main.matches.append(match)
+                if let player = Player.find(id: id!)
+                {
+                    match.players.append(player)
+                    Room.main.matches.append(match)
+                }
                 
                 // send room info to all
                 Room.main.sendInfo()
@@ -140,7 +135,7 @@ drop.socket("chat") { req, ws in
                     let matchId = json["match_id"]?.uint,
                     let match = Room.main.findMatch(id: matchId)
                 {
-                    match.playerIds.append(player.id)
+                    match.players.append(player)
                     match.state = .Playing
                     
                     if let diceMat = json["dice_mat"]?.string
@@ -211,11 +206,13 @@ drop.socket("chat") { req, ws in
         guard id != nil else {return}
         
         Room.main.connections.removeValue(forKey: id!)
-        
-        if let player = Player.find(id: id!)
-        {
-            player.connected = false
-            player.disconnectedAt = Date()
+        if let idx = Room.main.connectedPlayers.index(where: { (p) -> Bool in
+            return p.id == id
+        }) {
+            let p = Room.main.connectedPlayers[idx]
+            p.connected = false
+            p.disconnectedAt = Date()
+            Room.main.connectedPlayers.remove(at: idx)
         }
         
         // send to all that player has been disconnected

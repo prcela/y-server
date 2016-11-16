@@ -8,6 +8,7 @@ class Room
     
     var connections: [String: WebSocket]
     var matches = [Match]()
+    var connectedPlayers = [Player]()
     
     init() {
         connections = [:]
@@ -18,15 +19,9 @@ class Room
         // obriši mečeve sa disconnected igračima
         for (mIdx,m) in matches.enumerated()
         {
-            var anyConnected = false
-            for playerId in m.playerIds
-            {
-                if let p = Player.find(id: playerId), p.connected
-                {
-                    anyConnected = true
-                    break
-                }
-            }
+            let anyConnected = m.players.contains(where: { (p) -> Bool in
+                return p.connected
+            })
             
             if !anyConnected
             {
@@ -69,21 +64,17 @@ class Room
     
     func node() -> Node
     {
-        var activePlayers = Player.players.filter { (p) -> Bool in
-            return p.connected
-        }
+        var activePlayers = connectedPlayers
         
         let matchesInfo = matches.map({ match -> Node in
-            for pId in match.playerIds
+            for player in match.players
             {
                 // add also player which is not connected but still exists in match :(
-                if !activePlayers.contains(where: { (p) -> Bool in
-                    return p.id == pId
-                }) {
-                    if let mPlayer = Player.find(id: pId)
-                    {
-                        activePlayers.append(mPlayer)
-                    }
+                if activePlayers.contains(where: { (p) -> Bool in
+                    return p === player
+                })
+                {
+                    activePlayers.append(player)
                 }
             }
             return match.node()

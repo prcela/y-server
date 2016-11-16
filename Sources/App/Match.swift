@@ -20,10 +20,9 @@ private var matchIdCounter: UInt = 0
 
 class Match
 {
-    
     var id: UInt
     var state:MatchState = .WaitingForPlayers
-    var playerIds = [String]()
+    var players = [Player]()
     var diceMaterials: [String] = ["a","b"]
     var diceNum: Int = 6
     var bet: Int = 0
@@ -41,7 +40,7 @@ class Match
                      "name":"proba",
                      "state":Node(state.rawValue),
                      "bet":Node(bet),
-                     "players":Node(playerIds.map({ Node($0) })),
+                     "players":Node(players.map({ Node($0.id) })),
                      "dice_num":Node(diceNum),
                      "dice_materials": Node(diceMaterials.map({ Node($0) })) ])
     }
@@ -51,9 +50,9 @@ class Match
     {
         for (idCon, socket) in Room.main.connections
         {
-            for playerId in playerIds
+            for player in players
             {
-                if playerId == idCon
+                if player.id == idCon
                 {
                     socket.send(json)
                     continue
@@ -71,9 +70,9 @@ class Match
             {
                 continue
             }
-            for playerId in playerIds
+            for player in players
             {
-                if playerId == conId
+                if player.id == conId
                 {
                     socket.send(json)
                     continue

@@ -59,6 +59,21 @@ class StatItem
         return doc
     }
     
+    func node() -> Node
+    {
+        let timeInterval = timestamp.timeIntervalSince1970
+        let dic: [String:Node] = [
+            "player_id": Node(player_id),
+            "match_type": Node(match_type),
+            "dice_num": Node(Int(dice_num)),
+            "score": Node(Int(score)),
+            "result": Node(Int(result)),
+            "bet": Node(Int(bet)),
+            "timestamp": Node(timeInterval)
+            ]
+        return Node(dic)
+    }
+    
     class func loadStats()
     {
         allStatItems.removeAll()

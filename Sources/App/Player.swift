@@ -19,8 +19,8 @@ class Player
     var diamonds: Int64
     
     // izračunato
-    var avgScore5: Double = 0
-    var avgScore6: Double = 0
+    var avgScore5: Double?
+    var avgScore6: Double?
     var connected = true
     var disconnectedAt: Date?
     
@@ -29,8 +29,9 @@ class Player
     {
         id = json["id"]!.string!
         alias = json["alias"]!.string!
-        avgScore6 = json["avg_score_6"]!.double!
         diamonds = Int64(json["diamonds"]!.int!)
+        avgScore6 = json["avg_score_6"]?.double
+        avgScore5 = json["avg_score_5"]?.double
     }
     
     init(document: Document)
@@ -44,27 +45,50 @@ class Player
     {
         alias = json["alias"]!.string!
         diamonds = Int64(json["diamonds"]!.int!)
-        avgScore6 = json["avg_score_6"]!.double!
+        avgScore6 = json["avg_score_6"]?.double
+        avgScore5 = json["avg_score_5"]?.double
     }
     
     
     func node() -> Node
     {
-        return Node([
+        var dic: [String:Node] = [
             "id":Node(id),
             "alias":Node(alias),
-            "avg_score_6":Node(avgScore6),
             "diamonds":Node(Int(diamonds)),
-            "connected": Node(connected)])
+            "connected": Node(connected)]
+        
+        if avgScore5 != nil
+        {
+            dic["avg_score_5"] = Node(avgScore5!)
+        }
+        
+        if avgScore6 != nil
+        {
+            dic["avg_score_6"] = Node(avgScore6!)
+        }
+        
+        return Node(dic)
     }
     
     func document() -> Document
     {
-        let doc: Document = [
+        var doc: Document = [
             "_id": .string(id),
             "alias": .string(alias),
             "diamonds": .int64(diamonds)
         ]
+        
+        if avgScore5 != nil
+        {
+            doc["avg_score_5"] = .double(avgScore5!)
+        }
+        
+        if avgScore6 != nil
+        {
+            doc["avg_score_6"] = .double(avgScore6!)
+        }
+        
         return doc
     }
     

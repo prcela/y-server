@@ -37,6 +37,22 @@ drop.get("info") { request in
         ])
 }
 
+
+drop.get("players") { request in
+    
+    return try JSON(node:Node(Player.players.map({ (player) -> Node in
+        return player.node()
+    })))
+}
+
+drop.get("statItems") { request in
+    
+    return try JSON(node:Node(StatItem.allStatItems.map({ (item) -> Node in
+        return item.node()
+    })))
+}
+
+
 drop.post("statItem") { request in
     guard let json = request.json
         else {

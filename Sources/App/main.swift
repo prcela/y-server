@@ -121,7 +121,12 @@ drop.socket("chat") { req, ws in
                     player?.disconnectedAt = nil
                     
                     Room.main.connections[newId] = ws
-                    Room.main.connectedPlayers.append(player!)
+                    if !Room.main.connectedPlayers.contains(where: { (p) -> Bool in
+                        return p.id == id
+                    })
+                    {
+                        Room.main.connectedPlayers.append(player!)
+                    }
                     
                     // send room info to all
                     Room.main.sendInfo()

@@ -46,7 +46,7 @@ class Match
     }
     
     // send to all in match
-    func send(_ json: JSON) throws
+    func send(_ json: JSON)
     {
         for (idCon, socket) in Room.main.connections
         {
@@ -62,7 +62,7 @@ class Match
     }
     
     // send to all others in match
-    func sendOthers(fromPlayerId: String, json: JSON) throws
+    func sendOthers(fromPlayerId: String, json: JSON)
     {
         for (conId, socket) in Room.main.connections
         {

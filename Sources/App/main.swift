@@ -93,125 +93,48 @@ drop.socket("chat") { req, ws in
     ws.onBinary = {ws, bytes in
         print("onBinary")
         
-        let jsonBytes = try JSON(bytes: bytes)
-        let json = jsonBytes.object!
+        let json = try JSON(bytes: bytes)
         
-        print(json)
+        print(NSDate())
+        print(try! String(bytes: bytes))
         
         if let msgFuncName = json["msg_func"]?.string,
             let msgFunc = MessageFunc(rawValue: msgFuncName)
         {
             switch msgFunc {
             case .Join:
-                if let newId = json["id"]?.string,
-                    let alias = json["alias"]?.string
-                {
-                    id = newId
-                    
-                    var player = Player.find(id: newId)
-                    
-                    if player == nil
-                    {
-                        // instantiate new player
-                        player = Player(json: jsonBytes)
-                        Player.players.append(player!)
-                        try playersCollection.insert(player!.document())
-                    }
-                    player?.connected = true
-                    player?.disconnectedAt = nil
-                    
-                    Room.main.connections[newId] = ws
-                    if !Room.main.connectedPlayers.contains(where: { (p) -> Bool in
-                        return p.id == id
-                    })
-                    {
-                        Room.main.connectedPlayers.append(player!)
-                    }
-                    
-                    // send room info to all
-                    Room.main.sendInfo()
-                    
-                }
+                id = try Room.main.join(json: json, ws: ws)
                 
             case .CreateMatch:
                 guard id != nil else {return}
-                let match = Match()
-                match.diceMaterials = (json["dice_materials"]!.array as! [JSON]).map({ json in
-                    return json.node.string!
-                })
-                match.diceNum = json["dice_num"]!.int!
-                match.bet = json["bet"]?.int ?? 0
-                if let player = Player.find(id: id!)
-                {
-                    match.players.append(player)
-                    Room.main.matches.append(match)
-                }
+                Room.main.createMatch(json: json, playerId: id!)
                 
-                // send room info to all
-                Room.main.sendInfo()
                 
             case .JoinMatch:
                 guard id != nil else {return}
-                if let player = Player.find(id: id!),
-                    let matchId = json["match_id"]?.uint,
-                    let match = Room.main.findMatch(id: matchId)
-                {
-                    match.players.append(player)
-                    match.state = .Playing
-                    
-                    if let diceMat = json["dice_mat"]?.string
-                    {
-                        match.diceMaterials[1] = diceMat
-                    }
-                    
-                    // send room info to all
-                    Room.main.sendInfo()
-                    
-                    try match.send(JSON(node:["msg_func":msgFuncName, "isOK":true, "match_id":matchId]))
-                }
+                Room.main.joinMatch(json: json, playerId: id!)
+                
                 
             case .LeaveMatch:
                 guard id != nil else {return}
-                let matchId = json["match_id"]!.uint
-                
-                if let idx = Room.main.matches.index(where: {$0.id == matchId})
-                {
-                    let match = Room.main.matches[idx]
-                    Room.main.matches.remove(at: idx)
-                    try match.sendOthers(fromPlayerId: id!, json: jsonBytes)
-                }
-                
-                // send room info to all
-                Room.main.sendInfo()
+                Room.main.leaveMatch(json: json, playerId: id!)
                 
             case .InvitePlayer:
                 
                 let recipientId = json["recipient"]!.string!
-                Room.main.connections[recipientId]?.send(jsonBytes)
+                Room.main.connections[recipientId]?.send(json)
                 
             case .IgnoreInvitation:
                 
                 let senderId = json["sender"]!.string!
-                Room.main.connections[senderId]?.send(jsonBytes)
+                Room.main.connections[senderId]?.send(json)
                 
             case .UpdatePlayer:
                 guard id != nil else {return}
-                if let player = Player.find(id: id!)
-                {
-                    player.update(json: jsonBytes)
-                    try playersCollection.update(matching: ["_id":.string(id!)], to: player.document())
-                    
-                    Room.main.sendInfo()
-                }
+                try Room.main.updatePlayer(json: json, playerId: id!)
                 
             case .Turn:
-                if let id = json["id"]?.string,
-                    let matchId = json["match_id"]?.uint,
-                    let match = Room.main.findMatch(id: matchId)
-                {
-                    // forward message to other participants in match
-                    try match.sendOthers(fromPlayerId: id, json: jsonBytes)
-                }
+                Room.main.turn(json: json)
                 
             default:
                 print("Not implemented on yet")
@@ -225,25 +148,7 @@ drop.socket("chat") { req, ws in
         print("onClose")
         
         guard id != nil else {return}
-        
-        Room.main.connections.removeValue(forKey: id!)
-        if let idx = Room.main.connectedPlayers.index(where: { (p) -> Bool in
-            return p.id == id
-        }) {
-            let p = Room.main.connectedPlayers[idx]
-            p.connected = false
-            p.disconnectedAt = Date()
-            Room.main.connectedPlayers.remove(at: idx)
-        }
-        
-        // send to all that player has been disconnected
-        let jsonResponse = try JSON(node: ["msg_func":"disconnected", "id":id!])
-        Room.main.send(jsonResponse)
-        
-        Room.main.clean()
-        
-        // send info to all players
-        Room.main.sendInfo()
+        Room.main.onClose(playerId: id!)
     }
     
     ws.onPing = {ws, _ in

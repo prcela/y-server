@@ -1,4 +1,5 @@
 import Vapor
+import Foundation
 
 extension WebSocket {
     func send(_ json: JSON) {
@@ -6,7 +7,8 @@ extension WebSocket {
             let js = try json.makeBytes()
             try send(js.string)
         } catch {
-            print(error)
+            // TODO: Vjerojatno za ovo treba neki retry mehanizam ili slično??? Šta ako se npr. turn ne pošalje?
+            print("\(Date()) error: \(error)")
         }
     }
 }

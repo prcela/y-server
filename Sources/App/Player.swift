@@ -12,7 +12,7 @@ import MongoKitten
 
 class Player
 {
-    static var players = [Player]()
+    static var all = [Player]()
     
     var id: String
     var alias: String
@@ -21,7 +21,7 @@ class Player
     // izračunato
     var avgScore5: Double?
     var avgScore6: Double?
-    var connected = true
+    var connected = false
     var disconnectedAt: Date?
     
     
@@ -94,19 +94,19 @@ class Player
     
     class func loadPlayers()
     {
-        players.removeAll()
+        all.removeAll()
         if let array = try? playersCollection.find().array
         {
             for document in array
             {
-                players.append(Player(document: document))
+                all.append(Player(document: document))
             }
         }
     }
     
     class func find(id: String) -> Player?
     {
-        for p in players
+        for p in all
         {
             if p.id == id
             {

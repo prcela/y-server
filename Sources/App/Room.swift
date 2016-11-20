@@ -8,7 +8,6 @@ class Room
     
     var connections: [String: WebSocket]
     var matches = [Match]()
-    var connectedPlayers = [Player]()
     
     init() {
         connections = [:]
@@ -26,19 +25,13 @@ class Room
             {
                 // instantiate new player
                 player = Player(json: json)
-                Player.players.append(player!)
+                Player.all.append(player!)
                 try playersCollection.insert(player!.document())
             }
             player?.connected = true
             player?.disconnectedAt = nil
             
             connections[id] = ws
-            if !connectedPlayers.contains(where: { (p) -> Bool in
-                return p.id == id
-            })
-            {
-                connectedPlayers.append(player!)
-            }
             
             // send room info to all
             sendInfo()
@@ -55,7 +48,7 @@ class Room
         })
         match.diceNum = json["dice_num"]!.int!
         match.bet = json["bet"]?.int ?? 0
-        if let player = findConnectedPlayer(id: playerId)
+        if let player = Player.find(id: playerId)
         {
             match.players.append(player)
             matches.append(match)
@@ -67,7 +60,7 @@ class Room
     
     func joinMatch(json: JSON, playerId: String)
     {
-        guard let player = findConnectedPlayer(id: playerId),
+        guard let player = Player.find(id: playerId),
             let matchId = json["match_id"]?.uint,
             let match = findMatch(id: matchId) else
         {
@@ -113,7 +106,7 @@ class Room
     
     func updatePlayer(json: JSON, playerId: String) throws
     {
-        if let player = findConnectedPlayer(id: playerId)
+        if let player = Player.find(id: playerId)
         {
             player.update(json: json)
             try playersCollection.update(matching: ["_id":.string(playerId)], to: player.document())
@@ -137,13 +130,10 @@ class Room
     {
         connections.removeValue(forKey: playerId)
         
-        if let idx = connectedPlayers.index(where: { (p) -> Bool in
-            return p.id == playerId
-        }) {
-            let p = connectedPlayers[idx]
+        if let p = Player.find(id: playerId)
+        {
             p.connected = false
             p.disconnectedAt = Date()
-            connectedPlayers.remove(at: idx)
         }
         
         // send to all that player has been disconnected
@@ -170,18 +160,6 @@ class Room
                 matches.remove(at: mIdx)
             }
         }
-    }
-    
-    func findConnectedPlayer(id: String) -> Player?
-    {
-        for p in connectedPlayers
-        {
-            if p.id == id
-            {
-                return p
-            }
-        }
-        return nil
     }
     
     func findMatch(id: UInt) -> Match?
@@ -218,13 +196,15 @@ class Room
     
     func node() -> Node
     {
-        var activePlayers = connectedPlayers
+        var activePlayers = Player.all.filter { (p) -> Bool in
+            return p.connected
+        }
         
         let matchesInfo = matches.map({ match -> Node in
             for player in match.players
             {
                 // add also player which is not connected but still exists in match :(
-                if activePlayers.contains(where: { (p) -> Bool in
+                if !activePlayers.contains(where: { (p) -> Bool in
                     return p === player
                 })
                 {

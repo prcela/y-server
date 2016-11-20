@@ -39,6 +39,8 @@ class Player
         id = document["_id"].string
         alias = document["alias"].string
         diamonds = document["diamonds"].int64
+        avgScore5 = document["avg_score_5"].doubleValue
+        avgScore6 = document["avg_score_6"].doubleValue
     }
     
     func update(json: JSON)

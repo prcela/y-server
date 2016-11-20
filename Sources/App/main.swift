@@ -95,13 +95,7 @@ drop.socket("chat") { req, ws in
         
         let json = try JSON(bytes: bytes)
         
-        
-        do {
-            print(Date())
-            print(try String(bytes: bytes))
-        } catch {
-            print(error)
-        }
+        print(json.object!)
         
         if let msgFuncName = json["msg_func"]?.string,
             let msgFunc = MessageFunc(rawValue: msgFuncName)

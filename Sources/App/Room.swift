@@ -19,13 +19,13 @@ class Room
             let _ = json["alias"]?.string
         {
             
-            var player = Player.find(id: id)
+            var player = Player.all[id]
             
             if player == nil
             {
                 // instantiate new player
                 player = Player(json: json)
-                Player.all.append(player!)
+                Player.all[player!.id] = player!
                 try playersCollection.insert(player!.document())
             }
             player?.connected = true
@@ -48,7 +48,7 @@ class Room
         })
         match.diceNum = json["dice_num"]!.int!
         match.bet = json["bet"]?.int ?? 0
-        if let player = Player.find(id: playerId)
+        if let player = Player.all[playerId]
         {
             match.players.append(player)
             matches.append(match)
@@ -60,7 +60,7 @@ class Room
     
     func joinMatch(json: JSON, playerId: String)
     {
-        guard let player = Player.find(id: playerId),
+        guard let player = Player.all[playerId],
             let matchId = json["match_id"]?.uint,
             let match = findMatch(id: matchId) else
         {
@@ -106,7 +106,7 @@ class Room
     
     func updatePlayer(json: JSON, playerId: String) throws
     {
-        if let player = Player.find(id: playerId)
+        if let player = Player.all[playerId]
         {
             player.update(json: json)
             try playersCollection.update(matching: ["_id":.string(playerId)], to: player.document())
@@ -130,7 +130,7 @@ class Room
     {
         connections.removeValue(forKey: playerId)
         
-        if let p = Player.find(id: playerId)
+        if let p = Player.all[playerId]
         {
             p.connected = false
             p.disconnectedAt = Date()
@@ -196,25 +196,21 @@ class Room
     
     func node() -> Node
     {
-        var activePlayers = Player.all.filter { (p) -> Bool in
-            return p.connected
-        }
+        var playersInfo = connections.map({(key, ws) -> Node in
+            return Player.all[key]!.node()
+        })
         
         let matchesInfo = matches.map({ match -> Node in
+            
             for player in match.players
             {
                 // add also player which is not connected but still exists in match :(
-                if !activePlayers.contains(where: { (p) -> Bool in
-                    return p === player
-                })
+                if connections[player.id] == nil
                 {
-                    activePlayers.append(player)
+                    playersInfo.append(player.node())
                 }
             }
             return match.node()
-        })
-        let playersInfo = activePlayers.map({ player in
-            return player.node()
         })
         return ["msg_func": "room_info",
                 "players": Node(playersInfo),

@@ -40,7 +40,7 @@ drop.get("info") { request in
 
 drop.get("players") { request in
     
-    return try JSON(node:Node(Player.all.map({ (player) -> Node in
+    return try JSON(node:Node(Player.all.map({ (id,player) -> Node in
         return player.node()
     })))
 }
@@ -70,7 +70,7 @@ drop.post("updatePlayer") { request in
     }
     
     let id = json["id"]!.string!
-    if let player = Player.find(id: id)
+    if let player = Player.all[id]
     {
         player.update(json: json)
         try playersCollection.update(matching: ["_id": .string(id)], to: player.document())
@@ -79,7 +79,7 @@ drop.post("updatePlayer") { request in
     {
         // instantiate new player
         let player = Player(json: json)
-        Player.all.append(player)
+        Player.all[player.id] = player
         try playersCollection.insert(player.document())
     }
     

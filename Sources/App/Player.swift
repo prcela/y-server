@@ -12,7 +12,7 @@ import MongoKitten
 
 class Player
 {
-    static var all = [Player]()
+    static var all = [String:Player]()
     
     var id: String
     var alias: String
@@ -101,20 +101,10 @@ class Player
         {
             for document in array
             {
-                all.append(Player(document: document))
+                let id = document["_id"].string
+                all[id] = Player(document: document)
             }
         }
     }
     
-    class func find(id: String) -> Player?
-    {
-        for p in all
-        {
-            if p.id == id
-            {
-                return p
-            }
-        }
-        return nil
-    }
 }

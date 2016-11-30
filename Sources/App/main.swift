@@ -20,7 +20,7 @@ Player.loadPlayers()
 
 let drop = Droplet()
 
-private let minRequiredVersion = 4
+private let minRequiredVersion = 5
 
 drop.get { req in
     let lang = req.headers["Accept-Language"]?.string ?? "en"
@@ -127,6 +127,10 @@ drop.socket("chat") { req, ws in
                 
                 let senderId = json["sender"]!.string!
                 Room.main.connections[senderId]?.send(json)
+                
+            case .TextMessage:
+                let recipientId = json["recipient"]!.string!
+                Room.main.connections[recipientId]?.send(json)
                 
             case .UpdatePlayer:
                 guard id != nil else {return}

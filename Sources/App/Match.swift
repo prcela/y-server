@@ -26,7 +26,7 @@ class Match
     var diceMaterials: [String] = ["a","b"]
     var diceNum: Int = 6
     var bet: Int = 0
-    
+    var isPrivate = false
     
     init()
     {
@@ -40,6 +40,7 @@ class Match
                      "name":"proba",
                      "state":Node(state.rawValue),
                      "bet":Node(bet),
+                     "private":Node(isPrivate),
                      "players":Node(players.map({ Node($0.id) })),
                      "dice_num":Node(diceNum),
                      "dice_materials": Node(diceMaterials.map({ Node($0) })) ])

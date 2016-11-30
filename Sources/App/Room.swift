@@ -48,6 +48,8 @@ class Room
         })
         match.diceNum = json["dice_num"]!.int!
         match.bet = json["bet"]?.int ?? 0
+        match.isPrivate = json["private"]?.bool ?? false
+        
         if let player = Player.all[playerId]
         {
             match.players.append(player)

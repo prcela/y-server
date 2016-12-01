@@ -90,13 +90,8 @@ drop.post("updatePlayer") { request in
 drop.socket("chat") { req, ws in
     var id: String? = nil
     
-    ws.onBinary = {ws, bytes in
-        print("onBinary")
-        
-        let json = try JSON(bytes: bytes)
-        
-        print(json.object!)
-        
+    func process(json: JSON) throws
+    {
         if let msgFuncName = json["msg_func"]?.string,
             let msgFunc = MessageFunc(rawValue: msgFuncName)
         {
@@ -144,7 +139,19 @@ drop.socket("chat") { req, ws in
                 break
             }
         }
-        
+
+    }
+    
+    ws.onText = {ws, text in
+        let json = try JSON(bytes: text.utf8.array)
+        try process(json: json)
+        print(text)
+    }
+    
+    ws.onBinary = {ws, bytes in
+        let json = try JSON(bytes: bytes)
+        try process(json: json)
+        print(json.object!)
     }
     
     ws.onClose = { ws, _, _, _ in

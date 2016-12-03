@@ -8,7 +8,7 @@ extension WebSocket {
             try send(js.string)
         } catch {
             // TODO: Vjerojatno za ovo treba neki retry mehanizam ili slično??? Šta ako se npr. turn ne pošalje?
-            print("\(Date()) error: \(error)")
+            print("\(Date()) error: greška pri slanju json-a na ws")
         }
     }
 }

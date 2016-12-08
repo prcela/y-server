@@ -58,7 +58,7 @@ class DiceScore
     
     
     
-    func node() -> Node
+    func dic() -> Node
     {
         return [
             "score": Node(Int(score)),

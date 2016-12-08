@@ -1,6 +1,7 @@
-import Vapor
 import Foundation
 import Core
+import SwiftyJSON
+import WebSockets
 
 class Room
 {
@@ -13,57 +14,54 @@ class Room
         connections = [:]
     }
     
-    func join(json: JSON, ws: WebSocket) throws -> String?
+    func join(json: JSON, ws: WebSocket) throws -> Player?
     {
-        if let id = json["id"]?.string,
-            let _ = json["alias"]?.string
+        guard let id = json["id"].string,
+            let _ = json["alias"].string
+            else { return nil }
+            
+        var player = Player.all[id]
+        
+        if player == nil
         {
-            
-            var player = Player.all[id]
-            
-            if player == nil
-            {
-                // instantiate new player
-                player = Player(json: json)
-                Player.all[player!.id] = player!
-                try playersCollection.insert(player!.document())
-            }
-            player?.connected = true
-            player?.disconnectedAt = nil
-            
-            connections[id] = ws
-            
-            // send room info to all
-            sendInfo()
-            return id
+            // instantiate new player
+            player = Player(json: json)
+            Player.all[player!.id] = player!
+            try playersCollection.insert(player!.document())
         }
-        return nil
+        player?.connected = true
+        player?.disconnectedAt = nil
+        
+        connections[id] = ws
+        
+        player?.deleteExpiredMessages()
+        player?.sendUnsentMessages()
+        
+        // send room info to all
+        sendInfo()
+        return player
     }
-    
-    func createMatch(json: JSON, playerId: String)
+
+    func createMatch(json: JSON, player: Player)
     {
         let match = Match()
-        match.diceMaterials = (json["dice_materials"]!.array as! [JSON]).map({ json in
-            return json.node.string!
-        })
-        match.diceNum = json["dice_num"]!.int!
-        match.bet = json["bet"]?.int ?? 0
-        match.isPrivate = json["private"]?.bool ?? false
+        match.diceMaterials = json["dice_materials"].arrayObject as! [String]
+        match.diceNum = json["dice_num"].intValue
+        match.bet = json["bet"].int ?? 0
+        match.isPrivate = json["private"].bool ?? false
         
-        if let player = Player.all[playerId]
-        {
-            match.players.append(player)
-            matches.append(match)
-        }
+        
+        match.players.append(player)
+        matches.append(match)
         
         // send room info to all
         sendInfo()
     }
     
-    func joinMatch(json: JSON, playerId: String)
+    func joinMatch(json: JSON, player: Player)
     {
-        guard let player = Player.all[playerId],
-            let matchId = json["match_id"]?.uint,
+        guard
+            let matchId = json["match_id"].uInt,
             let match = findMatch(id: matchId) else
         {
             return
@@ -79,7 +77,7 @@ class Room
         match.players.append(player)
         match.state = .Playing
         
-        if let diceMat = json["dice_mat"]?.string
+        if let diceMat = json["dice_mat"].string
         {
             match.diceMaterials[1] = diceMat
         }
@@ -87,40 +85,39 @@ class Room
         // send room info to all
         sendInfo()
         
-        let jsonJoined = try! JSON(node:["msg_func":"join_match", "isOK":true, "match_id":matchId])
+        let jsonJoined = JSON(["msg_func":"join_match", "isOK":true, "match_id":matchId])
         match.send(jsonJoined)
         
     }
     
-    func leaveMatch(json: JSON, playerId: String) {
-        let matchId = json["match_id"]!.uint
+    func leaveMatch(json: JSON, player: Player) {
+        let matchId = json["match_id"].uIntValue
         
         if let idx = matches.index(where: {$0.id == matchId})
         {
             let match = matches[idx]
             matches.remove(at: idx)
-            match.sendOthers(fromPlayerId: playerId, json: json)
+            match.sendOthers(fromPlayerId: player.id, json: json)
         }
         
         // send room info to all
         sendInfo()
     }
     
-    func updatePlayer(json: JSON, playerId: String) throws
+    func updatePlayer(json: JSON, player: Player) throws
     {
-        if let player = Player.all[playerId]
-        {
-            player.update(json: json)
-            try playersCollection.update(matching: ["_id":.string(playerId)], to: player.document())
-            
-            sendInfo()
-        }
+        
+        player.update(json: json)
+        try playersCollection.update(matching: ["_id":.string(player.id)], to: player.document())
+        
+        sendInfo()
+        
     }
     
     func turn(json: JSON)
     {
-        if let id = json["id"]?.string,
-            let matchId = json["match_id"]?.uint,
+        if let id = json["id"].string,
+            let matchId = json["match_id"].uInt,
             let match = findMatch(id: matchId)
         {
             // forward message to other participants in match
@@ -128,40 +125,15 @@ class Room
         }
     }
     
-    func onClose(playerId: String)
+    func onClose(player: Player)
     {
-        connections.removeValue(forKey: playerId)
+        connections.removeValue(forKey: player.id)
         
-        if let p = Player.all[playerId]
-        {
-            p.connected = false
-            p.disconnectedAt = Date()
-        }
-        
-        // send to all that player has been disconnected
-        let jsonResponse = try! JSON(node: ["msg_func":"disconnected", "id":playerId])
-        send(jsonResponse)
-        
-        clean()
+        player.connected = false
+        player.disconnectedAt = Date()
         
         // send info to all players
         sendInfo()
-    }
-
-    // obriši mečeve sa disconnected igračima
-    func clean()
-    {
-        for (mIdx,m) in matches.enumerated()
-        {
-            let anyConnected = m.players.contains(where: { (p) -> Bool in
-                return p.connected
-            })
-            
-            if !anyConnected
-            {
-                matches.remove(at: mIdx)
-            }
-        }
     }
     
     func findMatch(id: UInt) -> Match?
@@ -190,32 +162,32 @@ class Room
     // send info to all in room
     func sendInfo()
     {
-        let json = try! JSON(node: node())
+        let json = JSON(dic())
         send(json)
     }
     
     
     
-    func node() -> Node
+    func dic() -> [String:Any]
     {
-        var playersInfo = connections.map({(key, ws) -> Node in
-            return Player.all[key]!.node()
+        var playersInfo = connections.map({(key, ws) -> [String:Any] in
+            return Player.all[key]!.dic()
         })
         
-        let matchesInfo = matches.map({ match -> Node in
+        let matchesInfo = matches.map({ match -> [String:Any] in
             
             for player in match.players
             {
                 // add also player which is not connected but still exists in match :(
                 if connections[player.id] == nil
                 {
-                    playersInfo.append(player.node())
+                    playersInfo.append(player.dic())
                 }
             }
-            return match.node()
+            return match.dic()
         })
         return ["msg_func": "room_info",
-                "players": Node(playersInfo),
-                "matches": Node(matchesInfo)]
+                "players": playersInfo,
+                "matches": matchesInfo]
     }
 }

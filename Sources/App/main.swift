@@ -1,6 +1,7 @@
-import Vapor
 import Foundation
 import MongoKitten
+import SwiftyJSON
+import Vapor
 
 let server: Server
 do {
@@ -20,7 +21,7 @@ Player.loadPlayers()
 
 let drop = Droplet()
 
-private let minRequiredVersion = 5
+private let minRequiredVersion = 6
 
 drop.get { req in
     let lang = req.headers["Accept-Language"]?.string ?? "en"
@@ -30,26 +31,26 @@ drop.get { req in
 }
 
 drop.get("info") { request in
-    return try JSON(node: [
+    return SwiftyJSON.JSON([
         "min_required_version": minRequiredVersion,
         "room_main_ct": Room.main.connections.count,
-        "room_main_free_ct": 0 // deprecated
-        ])
+        "room_main_free_ct": 0
+        ]).rawString()!
 }
 
 
 drop.get("players") { request in
     
-    return try JSON(node:Node(Player.all.map({ (id,player) -> Node in
-        return player.node()
-    })))
+    return SwiftyJSON.JSON(Player.all.map({ (id,player) -> [String:Any] in
+        return player.dic()
+    })).rawString()!
 }
 
 drop.get("statItems") { request in
     
-    return try JSON(node:Node(StatItem.allStatItems.map({ (item) -> Node in
-        return item.node()
-    })))
+    return SwiftyJSON.JSON(StatItem.allStatItems.map({ (item) -> [String:Any] in
+        return item.dic()
+    })).rawString()!
 }
 
 
@@ -64,12 +65,14 @@ drop.post("statItem") { request in
 }
 
 drop.post("updatePlayer") { request in
-    guard let json = request.json
+    guard let bytes = request.body.bytes
         else {
             throw Abort.badRequest
     }
     
-    let id = json["id"]!.string!
+    let json = try SwiftyJSON.JSON.parse(String(bytes: bytes))
+    
+    let id = json["id"].stringValue
     if let player = Player.all[id]
     {
         player.update(json: json)
@@ -88,48 +91,65 @@ drop.post("updatePlayer") { request in
 }
 
 drop.socket("chat") { req, ws in
-    var id: String? = nil
+    var player: Player? = nil
     
-    func process(json: JSON) throws
+//    // ping the socket to keep it open
+//    try background {
+//        while ws.state == .open {
+//            try? ws.ping()
+//            drop.console.wait(seconds: 10) // every 10 seconds
+//        }
+//    }
+    
+    func process(json: SwiftyJSON.JSON) throws
     {
-        if let msgFuncName = json["msg_func"]?.string,
+        if let msgId = json["ack"].uInt
+        {
+            if let msgIdx = player?.sentMessages.index(where: { (msg) -> Bool in
+                return msg.id == msgId
+            })
+            {
+                print("message \(msgId) removed")
+                player?.sentMessages.remove(at: msgIdx)
+            }
+        }
+        else if let msgFuncName = json["msg_func"].string,
             let msgFunc = MessageFunc(rawValue: msgFuncName)
         {
             switch msgFunc {
             case .Join:
-                id = try Room.main.join(json: json, ws: ws)
+                player = try Room.main.join(json: json, ws: ws)
                 
             case .CreateMatch:
-                guard id != nil else {return}
-                Room.main.createMatch(json: json, playerId: id!)
+                guard player != nil else {return}
+                Room.main.createMatch(json: json, player: player!)
                 
                 
             case .JoinMatch:
-                guard id != nil else {return}
-                Room.main.joinMatch(json: json, playerId: id!)
-                
+                guard player != nil else {return}
+                Room.main.joinMatch(json: json, player: player!)
                 
             case .LeaveMatch:
-                guard id != nil else {return}
-                Room.main.leaveMatch(json: json, playerId: id!)
+                guard player != nil else {return}
+                Room.main.leaveMatch(json: json, player: player!)
                 
             case .InvitePlayer:
                 
-                let recipientId = json["recipient"]!.string!
+                let recipientId = json["recipient"].stringValue
                 Room.main.connections[recipientId]?.send(json)
                 
             case .IgnoreInvitation:
                 
-                let senderId = json["sender"]!.string!
+                let senderId = json["sender"].stringValue
                 Room.main.connections[senderId]?.send(json)
                 
             case .TextMessage:
-                let recipientId = json["recipient"]!.string!
+                let recipientId = json["recipient"].stringValue
                 Room.main.connections[recipientId]?.send(json)
                 
             case .UpdatePlayer:
-                guard id != nil else {return}
-                try Room.main.updatePlayer(json: json, playerId: id!)
+                guard player != nil else {return}
+                try Room.main.updatePlayer(json: json, player: player!)
                 
             case .Turn:
                 Room.main.turn(json: json)
@@ -143,22 +163,22 @@ drop.socket("chat") { req, ws in
     }
     
     ws.onText = {ws, text in
-        let json = try JSON(bytes: text.utf8.array)
+        let json = SwiftyJSON.JSON.parse(text)
         try process(json: json)
         print(text)
     }
     
     ws.onBinary = {ws, bytes in
-        let json = try JSON(bytes: bytes)
+        let json = try SwiftyJSON.JSON.parse(String(bytes: bytes))
         try process(json: json)
-        print(json.object!)
+        print(json)
     }
     
-    ws.onClose = { ws, _, _, _ in
-        print("onClose")
+    ws.onClose = { ws, code, reason, clean in
+        print("onClose code: \(code) reason: \(reason) \(clean)")
         
-        guard id != nil else {return}
-        Room.main.onClose(playerId: id!)
+        guard player != nil else {return}
+        Room.main.onClose(player: player!)
     }
     
     ws.onPing = {ws, _ in
@@ -166,5 +186,82 @@ drop.socket("chat") { req, ws in
     }
 
 }
+
+
+try background {
+    
+    // Player can return to game even after he has been disconnected.
+    
+    while true {
+        print("room matches background check")
+        drop.console.wait(seconds: 3) // every n seconds
+        let now = Date()
+        for (mIdx,m) in Room.main.matches.enumerated().reversed()
+        {
+            var anyDumped = false
+            for p in m.players
+            {
+                if !p.sentMessages.isEmpty || !p.connected
+                {
+                    func dump()
+                    {
+                        // dump the player
+                        print("Player dumped")
+                        let jsonResponse = JSON(["msg_func":"dump", "id":p.id, "match_id":m.id])
+                        m.send(jsonResponse, ttl: 3600) // one hour
+                        anyDumped = true
+                    }
+                    
+                    func willBeDumped()
+                    {
+                        // send to all that player may be dumped soon
+                        print("Player will be dumped soon")
+                        let jsonResponse = JSON(["msg_func":"maybe_someone_will_dump", "id":p.id, "match_id":m.id])
+                        m.sendOthers(fromPlayerId: p.id, json: jsonResponse)
+                    }
+                    
+                    if let lastShortMsg = p.sentMessages.filter({ (msg) -> Bool in
+                        return msg.ttl < 20
+                    }).last
+                    {
+                        if lastShortMsg.timestamp.addingTimeInterval(20) < now
+                        {
+                            print("player last message older than 20s")
+                            dump()
+                        }
+                        else if lastShortMsg.timestamp.addingTimeInterval(10) < now
+                        {
+                            print("player last message older than 10s")
+                            willBeDumped()
+                        }
+                    }
+                    
+                    if let disconnectedAt = p.disconnectedAt
+                    {
+                        if disconnectedAt.addingTimeInterval(20) < now
+                        {
+                            print("player disconnected longer than 20s")
+                            dump()
+                        }
+                        else if disconnectedAt.addingTimeInterval(5) < now
+                        {
+                            print("player disconnected longer than 5s")
+                            willBeDumped()
+                        }
+                    }
+                }
+                
+                p.deleteExpiredMessages()
+            }
+            
+            if anyDumped
+            {
+                Room.main.matches.remove(at: mIdx)
+                Room.main.sendInfo()
+            }
+        }
+    }
+}
+
 
 drop.run()

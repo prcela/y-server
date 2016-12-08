@@ -7,7 +7,7 @@
 //
 
 import Foundation
-import Vapor
+import SwiftyJSON
 
 enum MatchState: String
 {
@@ -34,52 +34,36 @@ class Match
         id = matchIdCounter
     }
     
-    func node() -> Node
+    func dic() -> [String:Any]
     {
-        return Node(["id":Node(id),
-                     "name":"proba",
-                     "state":Node(state.rawValue),
-                     "bet":Node(bet),
-                     "private":Node(isPrivate),
-                     "players":Node(players.map({ Node($0.id) })),
-                     "dice_num":Node(diceNum),
-                     "dice_materials": Node(diceMaterials.map({ Node($0) })) ])
+        return ["id":id,
+                "name":"proba",
+                "state":state.rawValue,
+                "bet":bet,
+                "private":isPrivate,
+                "players":players.map({ $0.id }),
+                "dice_num":diceNum,
+                "dice_materials": diceMaterials ]
     }
     
     // send to all in match
-    func send(_ json: JSON)
+    func send(_ json: JSON, ttl: TimeInterval = 15)
     {
-        for (idCon, socket) in Room.main.connections
+        for player in players
         {
-            for player in players
-            {
-                if player.id == idCon
-                {
-                    socket.send(json)
-                    continue
-                }
-            }
+            player.send(json: json, ttl: ttl)
         }
     }
     
     // send to all others in match
     func sendOthers(fromPlayerId: String, json: JSON)
     {
-        for (conId, socket) in Room.main.connections
+        for player in players
         {
-            if conId == fromPlayerId
+            if player.id != fromPlayerId
             {
-                continue
+                player.send(json: json)
             }
-            for player in players
-            {
-                if player.id == conId
-                {
-                    socket.send(json)
-                    continue
-                }
-            }
-            
         }
     }
 }

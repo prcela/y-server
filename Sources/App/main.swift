@@ -24,6 +24,7 @@ let drop = Droplet()
 private let minRequiredVersion = 6
 
 drop.get { req in
+    print("prazni get")
     let lang = req.headers["Accept-Language"]?.string ?? "en"
     return try drop.view.make("welcome", [
     	"message": Node.string(drop.localization[lang, "welcome", "title"])
@@ -31,6 +32,7 @@ drop.get { req in
 }
 
 drop.get("info") { request in
+    print("info")
     return SwiftyJSON.JSON([
         "min_required_version": minRequiredVersion,
         "room_main_ct": Room.main.connections.count,
@@ -40,14 +42,14 @@ drop.get("info") { request in
 
 
 drop.get("players") { request in
-    
+    print("players")
     return SwiftyJSON.JSON(Player.all.map({ (id,player) -> [String:Any] in
         return player.dic()
     })).rawString()!
 }
 
 drop.get("statItems") { request in
-    
+    print("stat items")
     return SwiftyJSON.JSON(StatItem.allStatItems.map({ (item) -> [String:Any] in
         return item.dic()
     })).rawString()!
@@ -55,6 +57,7 @@ drop.get("statItems") { request in
 
 
 drop.post("statItem") { request in
+    print("stat item")
     guard let json = request.json
         else {
             throw Abort.badRequest
@@ -65,6 +68,7 @@ drop.post("statItem") { request in
 }
 
 drop.post("updatePlayer") { request in
+    print("updatePlayer")
     guard let bytes = request.body.bytes
         else {
             throw Abort.badRequest
@@ -96,6 +100,7 @@ drop.socket("chat") { req, ws in
     // ping the socket to keep it open
     try background {
         while ws.state == .open {
+            print("ping")
             try? ws.ping()
             drop.console.wait(seconds: 10) // every 10 seconds
         }

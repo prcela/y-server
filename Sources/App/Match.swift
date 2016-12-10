@@ -49,8 +49,10 @@ class Match
     // send to all in match
     func send(_ json: JSON, ttl: TimeInterval = 15)
     {
+        print("match send")
         for player in players
         {
+            print("pplayer send json ttl")
             player.send(json: json, ttl: ttl)
         }
     }

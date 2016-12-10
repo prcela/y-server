@@ -83,7 +83,9 @@ class Room
         }
         
         // send room info to all
+        
         sendInfo()
+        print("info sent")
         
         let jsonJoined = JSON(["msg_func":"join_match", "isOK":true, "match_id":matchId])
         match.send(jsonJoined)

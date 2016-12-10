@@ -4,6 +4,7 @@ import WebSockets
 
 extension WebSocket {
     func send(_ json: JSON) {
+        print("json: \(json)")
         do {
             if let str = json.rawString()
             {

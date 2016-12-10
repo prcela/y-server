@@ -100,13 +100,13 @@ class Player
     {
         msgCounter += 1
         // create a coy that is unique for player
-        var o = json
+        var json = json
         print("created copy")
-        o["msg_id"]! = JSON(Node(msgCounter))
+        json["msg_id"] = JSON(Node(msgCounter))
         
         if let socket = Room.main.connections[id]
         {
-            socket.send(o)
+            socket.send(json)
         }
         
         print("sentmessages.append")

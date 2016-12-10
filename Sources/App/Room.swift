@@ -164,7 +164,9 @@ class Room
     // send info to all in room
     func sendInfo()
     {
+        print("sendInfo()")
         let json = JSON(dic())
+        print("send(json")
         send(json)
     }
     

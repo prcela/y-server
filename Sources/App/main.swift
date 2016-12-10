@@ -164,16 +164,17 @@ drop.socket("chat") { req, ws in
     
     ws.onText = {ws, text in
         print(Date())
+        print(text)
         let json = SwiftyJSON.JSON.parse(string: text)
         try process(json: json)
-        print(text)
+        
     }
     
     ws.onBinary = {ws, bytes in
         print(Date())
         let json = try SwiftyJSON.JSON.parse(string: String(bytes: bytes))
-        try process(json: json)
         print(json)
+        try process(json: json)
     }
     
     ws.onClose = { ws, code, reason, clean in

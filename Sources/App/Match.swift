@@ -66,4 +66,67 @@ class Match
             }
         }
     }
+    
+    func clean() -> Bool
+    {
+        let now = Date()
+        var anyDumped = false
+        
+        func dump(_ p: Player)
+        {
+            // dump the player
+            print("Player dumped")
+            let jsonResponse = JSON(["msg_func":"dump", "id":p.id, "match_id":id])
+            send(jsonResponse, ttl: 3600) // one hour
+            anyDumped = true
+        }
+        
+        func willBeDumped(_ p: Player)
+        {
+            // send to all that player may be dumped soon
+            print("Player will be dumped soon")
+            let jsonResponse = JSON(["msg_func":"maybe_someone_will_dump", "id":p.id, "match_id":id])
+            sendOthers(fromPlayerId: p.id, json: jsonResponse)
+        }
+        
+        for p in players
+        {
+            if !p.sentMessages.isEmpty || !p.connected
+            {
+                
+                if let lastShortMsg = p.sentMessages.filter({ (msg) -> Bool in
+                    return msg.ttl < 20
+                }).last
+                {
+                    if lastShortMsg.timestamp.addingTimeInterval(20) < now
+                    {
+                        print("player last message older than 20s")
+                        dump(p)
+                    }
+                    else if lastShortMsg.timestamp.addingTimeInterval(10) < now
+                    {
+                        print("player last message older than 10s")
+                        willBeDumped(p)
+                    }
+                }
+                
+                if let disconnectedAt = p.disconnectedAt
+                {
+                    if disconnectedAt.addingTimeInterval(20) < now
+                    {
+                        print("player disconnected longer than 20s")
+                        dump(p)
+                    }
+                    else if disconnectedAt.addingTimeInterval(5) < now
+                    {
+                        print("player disconnected longer than 5s")
+                        willBeDumped(p)
+                    }
+                }
+            }
+            
+            p.deleteExpiredMessages()
+        }
+        return anyDumped
+    }
 }

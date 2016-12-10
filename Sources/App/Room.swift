@@ -190,4 +190,22 @@ class Room
                 "players": playersInfo,
                 "matches": matchesInfo]
     }
+    
+    func clean()
+    {
+        var ctCleaned = 0
+        for (mIdx,m) in matches.enumerated().reversed()
+        {
+            if m.clean()
+            {
+                ctCleaned += 1
+                matches.remove(at: mIdx)
+            }
+        }
+        
+        if ctCleaned > 0
+        {
+            sendInfo()
+        }
+    }
 }

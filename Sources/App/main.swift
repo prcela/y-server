@@ -163,12 +163,14 @@ drop.socket("chat") { req, ws in
     }
     
     ws.onText = {ws, text in
+        print(Date())
         let json = SwiftyJSON.JSON.parse(text)
         try process(json: json)
         print(text)
     }
     
     ws.onBinary = {ws, bytes in
+        print(Date())
         let json = try SwiftyJSON.JSON.parse(String(bytes: bytes))
         try process(json: json)
         print(json)
@@ -193,73 +195,10 @@ try background {
     // Player can return to game even after he has been disconnected.
     
     while true {
+        print(Date())
         print("room matches background check")
         drop.console.wait(seconds: 3) // every n seconds
-        let now = Date()
-        for (mIdx,m) in Room.main.matches.enumerated().reversed()
-        {
-            var anyDumped = false
-            for p in m.players
-            {
-                if !p.sentMessages.isEmpty || !p.connected
-                {
-                    func dump()
-                    {
-                        // dump the player
-                        print("Player dumped")
-                        let jsonResponse = JSON(["msg_func":"dump", "id":p.id, "match_id":m.id])
-                        m.send(jsonResponse, ttl: 3600) // one hour
-                        anyDumped = true
-                    }
-                    
-                    func willBeDumped()
-                    {
-                        // send to all that player may be dumped soon
-                        print("Player will be dumped soon")
-                        let jsonResponse = JSON(["msg_func":"maybe_someone_will_dump", "id":p.id, "match_id":m.id])
-                        m.sendOthers(fromPlayerId: p.id, json: jsonResponse)
-                    }
-                    
-                    if let lastShortMsg = p.sentMessages.filter({ (msg) -> Bool in
-                        return msg.ttl < 20
-                    }).last
-                    {
-                        if lastShortMsg.timestamp.addingTimeInterval(20) < now
-                        {
-                            print("player last message older than 20s")
-                            dump()
-                        }
-                        else if lastShortMsg.timestamp.addingTimeInterval(10) < now
-                        {
-                            print("player last message older than 10s")
-                            willBeDumped()
-                        }
-                    }
-                    
-                    if let disconnectedAt = p.disconnectedAt
-                    {
-                        if disconnectedAt.addingTimeInterval(20) < now
-                        {
-                            print("player disconnected longer than 20s")
-                            dump()
-                        }
-                        else if disconnectedAt.addingTimeInterval(5) < now
-                        {
-                            print("player disconnected longer than 5s")
-                            willBeDumped()
-                        }
-                    }
-                }
-                
-                p.deleteExpiredMessages()
-            }
-            
-            if anyDumped
-            {
-                Room.main.matches.remove(at: mIdx)
-                Room.main.sendInfo()
-            }
-        }
+        Room.main.clean()
     }
 }
 

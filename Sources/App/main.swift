@@ -93,13 +93,13 @@ drop.post("updatePlayer") { request in
 drop.socket("chat") { req, ws in
     var player: Player? = nil
     
-//    // ping the socket to keep it open
-//    try background {
-//        while ws.state == .open {
-//            try? ws.ping()
-//            drop.console.wait(seconds: 10) // every 10 seconds
-//        }
-//    }
+    // ping the socket to keep it open
+    try background {
+        while ws.state == .open {
+            try? ws.ping()
+            drop.console.wait(seconds: 10) // every 10 seconds
+        }
+    }
     
     func process(json: SwiftyJSON.JSON) throws
     {

@@ -7,7 +7,7 @@
 //
 
 import Foundation
-import SwiftyJSON
+import Vapor
 
 enum MatchState: String
 {
@@ -34,16 +34,16 @@ class Match
         id = matchIdCounter
     }
     
-    func dic() -> [String:Any]
+    func node() -> Node
     {
-        return ["id":id,
-                "name":"proba",
-                "state":state.rawValue,
-                "bet":bet,
-                "private":isPrivate,
-                "players":players.map({ $0.id }),
-                "dice_num":diceNum,
-                "dice_materials": diceMaterials ]
+        return Node(["id":Node(id),
+                     "name":"proba",
+                     "state":Node(state.rawValue),
+                     "bet":Node(bet),
+                     "private":Node(isPrivate),
+                     "players":Node(players.map({ Node($0.id) })),
+                     "dice_num":Node(diceNum),
+                     "dice_materials": Node(diceMaterials.map({ Node($0) })) ])
     }
     
     // send to all in match
@@ -78,7 +78,7 @@ class Match
         {
             // dump the player
             print("Player dumped")
-            let jsonResponse = JSON(["msg_func":"dump", "id":p.id, "match_id":id])
+            let jsonResponse = try! JSON(node: ["msg_func":"dump", "id":Node(p.id), "match_id":Node(id)])
             send(jsonResponse, ttl: 3600) // one hour
             anyDumped = true
         }
@@ -87,7 +87,7 @@ class Match
         {
             // send to all that player may be dumped soon
             print("Player will be dumped soon")
-            let jsonResponse = JSON(["msg_func":"maybe_someone_will_dump", "id":p.id, "match_id":id])
+            let jsonResponse = try! JSON(node:["msg_func":"maybe_someone_will_dump", "id":Node(p.id), "match_id":Node(id)])
             sendOthers(fromPlayerId: p.id, json: jsonResponse)
         }
         

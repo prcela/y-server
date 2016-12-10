@@ -7,8 +7,8 @@
 //
 
 import Foundation
+import Vapor
 import MongoKitten
-import SwiftyJSON
 
 class Player
 {
@@ -27,13 +27,13 @@ class Player
     var msgCounter: UInt = 0
     var sentMessages = [SentMsg]()
     
-    init(json: SwiftyJSON.JSON)
+    init(json: JSON)
     {
-        id = json["id"].stringValue
-        alias = json["alias"].stringValue
-        diamonds = json["diamonds"].int64Value
-        avgScore6 = json["avg_score_6"].double
-        avgScore5 = json["avg_score_5"].double
+        id = json["id"]!.string!
+        alias = json["alias"]!.string!
+        diamonds = Int64(json["diamonds"]!.int!)
+        avgScore6 = json["avg_score_6"]?.double
+        avgScore5 = json["avg_score_5"]?.double
     }
     
     init(document: Document)
@@ -47,32 +47,32 @@ class Player
     
     func update(json: JSON)
     {
-        alias = json["alias"].stringValue
-        diamonds = json["diamonds"].int64Value
-        avgScore6 = json["avg_score_6"].double
-        avgScore5 = json["avg_score_5"].double
+        alias = json["alias"]!.string!
+        diamonds = Int64(json["diamonds"]!.int!)
+        avgScore6 = json["avg_score_6"]?.double
+        avgScore5 = json["avg_score_5"]?.double
     }
     
     
-    func dic() -> [String:Any]
+    func node() -> Node
     {
-        var dic: [String:Any] = [
-            "id":id,
-            "alias":alias,
-            "diamonds":diamonds,
-            "connected": connected]
+        var dic: [String:Node] = [
+            "id":Node(id),
+            "alias":Node(alias),
+            "diamonds":Node(Int(diamonds)),
+            "connected": Node(connected)]
         
         if avgScore5 != nil
         {
-            dic["avg_score_5"] = avgScore5!
+            dic["avg_score_5"] = Node(avgScore5!)
         }
         
         if avgScore6 != nil
         {
-            dic["avg_score_6"] = avgScore6!
+            dic["avg_score_6"] = Node(avgScore6!)
         }
         
-        return dic
+        return Node(dic)
     }
     
     func document() -> Document
@@ -99,12 +99,14 @@ class Player
     func send(json: JSON, ttl: TimeInterval = 15)
     {
         msgCounter += 1
-        var json = json // create a coy that is unique for player
+        // create a coy that is unique for player
+        var o = json
         print("created copy")
-        json["msg_id"].uInt = msgCounter
+        o["msg_id"]! = JSON(Node(msgCounter))
+        
         if let socket = Room.main.connections[id]
         {
-            socket.send(json)
+            socket.send(o)
         }
         
         print("sentmessages.append")

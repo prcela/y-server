@@ -1,6 +1,5 @@
 import Foundation
 import MongoKitten
-import SwiftyJSON
 import Vapor
 
 let server: Server
@@ -32,27 +31,26 @@ drop.get { req in
 }
 
 drop.get("info") { request in
-    print("info")
-    return SwiftyJSON.JSON([
+    return try JSON(node: [
         "min_required_version": minRequiredVersion,
         "room_main_ct": Room.main.connections.count,
         "room_main_free_ct": 0
-        ]).rawString()!
+        ])
 }
 
 
 drop.get("players") { request in
-    print("players")
-    return SwiftyJSON.JSON(Player.all.map({ (id,player) -> [String:Any] in
-        return player.dic()
-    })).rawString()!
+    
+    return try JSON(node:Node(Player.all.map({ (id,player) -> Node in
+        return player.node()
+    })))
 }
 
 drop.get("statItems") { request in
-    print("stat items")
-    return SwiftyJSON.JSON(StatItem.allStatItems.map({ (item) -> [String:Any] in
-        return item.dic()
-    })).rawString()!
+    
+    return try JSON(node:Node(StatItem.allStatItems.map({ (item) -> Node in
+        return item.node()
+    })))
 }
 
 
@@ -68,15 +66,12 @@ drop.post("statItem") { request in
 }
 
 drop.post("updatePlayer") { request in
-    print("updatePlayer")
-    guard let bytes = request.body.bytes
+    guard let json = request.json
         else {
             throw Abort.badRequest
     }
     
-    let json = try SwiftyJSON.JSON.parse(string: String(bytes: bytes))
-    
-    let id = json["id"].stringValue
+    let id = json["id"]!.string!
     if let player = Player.all[id]
     {
         player.update(json: json)
@@ -106,9 +101,9 @@ drop.socket("chat") { req, ws in
         }
     }
     
-    func process(json: SwiftyJSON.JSON) throws
+    func process(json: JSON) throws
     {
-        if let msgId = json["ack"].uInt
+        if let msgId = json["ack"]?.uint
         {
             if let msgIdx = player?.sentMessages.index(where: { (msg) -> Bool in
                 return msg.id == msgId
@@ -118,7 +113,7 @@ drop.socket("chat") { req, ws in
                 player?.sentMessages.remove(at: msgIdx)
             }
         }
-        else if let msgFuncName = json["msg_func"].string,
+        else if let msgFuncName = json["msg_func"]?.string,
             let msgFunc = MessageFunc(rawValue: msgFuncName)
         {
             switch msgFunc {
@@ -140,17 +135,17 @@ drop.socket("chat") { req, ws in
                 
             case .InvitePlayer:
                 
-                let recipientId = json["recipient"].stringValue
+                let recipientId = json["recipient"]!.string!
                 Room.main.connections[recipientId]?.send(json)
                 
             case .IgnoreInvitation:
                 
-                let senderId = json["sender"].stringValue
+                let senderId = json["sender"]!.string!
                 Room.main.connections[senderId]?.send(json)
                 
             case .TextMessage:
-                let recipientId = json["recipient"].stringValue
-                Room.main.connections[recipientId]?.send(json)
+                let recipientId = json["recipient"]!.string
+                Room.main.connections[recipientId!]?.send(json)
                 
             case .UpdatePlayer:
                 guard player != nil else {return}
@@ -170,14 +165,14 @@ drop.socket("chat") { req, ws in
     ws.onText = {ws, text in
         print(Date())
         print(text)
-        let json = SwiftyJSON.JSON.parse(string: text)
+        let json = try JSON(bytes: text.utf8.array)
         try process(json: json)
         
     }
     
     ws.onBinary = {ws, bytes in
         print(Date())
-        let json = try SwiftyJSON.JSON.parse(string: String(bytes: bytes))
+        let json = try JSON(bytes: bytes)
         print(json)
         try process(json: json)
     }

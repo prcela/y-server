@@ -59,19 +59,19 @@ class StatItem
         return doc
     }
     
-    func dic() -> [String:Any]
+    func node() -> Node
     {
         let timeInterval = timestamp.timeIntervalSince1970
-        let dic:[String:Any] = [
-            "player_id": player_id,
-            "match_type": match_type,
-            "dice_num": dice_num,
-            "score": score,
-            "result": result,
-            "bet": bet,
-            "timestamp": timeInterval
+        let dic: [String:Node] = [
+            "player_id": Node(player_id),
+            "match_type": Node(match_type),
+            "dice_num": Node(Int(dice_num)),
+            "score": Node(Int(score)),
+            "result": Node(Int(result)),
+            "bet": Node(Int(bet)),
+            "timestamp": Node(timeInterval)
             ]
-        return dic
+        return Node(dic)
     }
     
     class func loadStats()

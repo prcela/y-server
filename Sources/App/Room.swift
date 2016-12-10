@@ -166,8 +166,9 @@ class Room
     {
         print("sendInfo()")
         let json = JSON(dic())
-        print("send(json")
+        print("send(json)")
         send(json)
+        print("json sent")
     }
     
     

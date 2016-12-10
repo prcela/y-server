@@ -5,7 +5,8 @@ let package = Package(
     dependencies: [
         .Package(url: "https://github.com/vapor/vapor.git", majorVersion: 1),
         .Package(url: "https://github.com/OpenKitten/MongoKitten.git", majorVersion: 2, minor: 0),
-        .Package(url: "https://github.com/SwiftyJSON/SwiftyJSON.git", versions: Version(1,0,0)..<Version(3, .max, .max))
+        .Package(url: "https://github.com/IBM-Swift/SwiftyJSON.git", majorVersion: 15)
+//        .Package(url: "https://github.com/Zewo/JSON.git", majorVersion: 0, minor: 6),
     ],
     exclude: [
         "Config",

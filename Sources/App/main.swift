@@ -70,7 +70,7 @@ drop.post("updatePlayer") { request in
             throw Abort.badRequest
     }
     
-    let json = try SwiftyJSON.JSON.parse(String(bytes: bytes))
+    let json = try SwiftyJSON.JSON.parse(string: String(bytes: bytes))
     
     let id = json["id"].stringValue
     if let player = Player.all[id]
@@ -164,14 +164,14 @@ drop.socket("chat") { req, ws in
     
     ws.onText = {ws, text in
         print(Date())
-        let json = SwiftyJSON.JSON.parse(text)
+        let json = SwiftyJSON.JSON.parse(string: text)
         try process(json: json)
         print(text)
     }
     
     ws.onBinary = {ws, bytes in
         print(Date())
-        let json = try SwiftyJSON.JSON.parse(String(bytes: bytes))
+        let json = try SwiftyJSON.JSON.parse(string: String(bytes: bytes))
         try process(json: json)
         print(json)
     }

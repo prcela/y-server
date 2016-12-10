@@ -170,14 +170,19 @@ class Room
     
     func dic() -> [String:Any]
     {
+        print("Room dic")
         var playersInfo = connections.map({(key, ws) -> [String:Any] in
+            print("key \(key)")
             return Player.all[key]!.dic()
         })
         
+        print("Matches info")
         let matchesInfo = matches.map({ match -> [String:Any] in
             
+            print("Match id: \(match.id)")
             for player in match.players
             {
+                print("player id \(player.id)")
                 // add also player which is not connected but still exists in match :(
                 if connections[player.id] == nil
                 {
@@ -186,6 +191,7 @@ class Room
             }
             return match.dic()
         })
+        print("return room dic")
         return ["msg_func": "room_info",
                 "players": playersInfo,
                 "matches": matchesInfo]

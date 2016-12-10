@@ -190,17 +190,17 @@ drop.socket("chat") { req, ws in
 }
 
 
-try background {
-    
-    // Player can return to game even after he has been disconnected.
-    
-    while true {
-        print(Date())
-        print("room matches background check")
-        drop.console.wait(seconds: 3) // every n seconds
-        Room.main.clean()
-    }
-}
+//try background {
+//    
+//    // Player can return to game even after he has been disconnected.
+//    
+//    while true {
+//        print(Date())
+//        print("room matches background check")
+//        drop.console.wait(seconds: 3) // every n seconds
+//        Room.main.clean()
+//    }
+//}
 
 
 drop.run()
